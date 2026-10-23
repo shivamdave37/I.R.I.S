@@ -11,6 +11,7 @@ _speaker_lock = threading.Lock()
 
 def _load_speech_recognition():
     """Load the microphone library only when voice input is requested."""
+    # Import lazily so importing voice does not fail when audio packages are missing.
     import speech_recognition
 
     return speech_recognition
@@ -18,6 +19,8 @@ def _load_speech_recognition():
 
 def listen():
     """Listen briefly and return recognized text or None on any mic failure."""
+    # Never listen while speech is playing so Jarvis cannot hear its own output.
+    wait_until_done()
     try:
         speech_recognition = _load_speech_recognition()
         recognizer = speech_recognition.Recognizer()
@@ -33,6 +36,7 @@ def listen():
 def _speaker_worker():
     """Own the speech engine and process queued text on one thread."""
     try:
+        # pyttsx3 is not thread-safe so it must only be used on this single worker thread.
         import pyttsx3
 
         engine = pyttsx3.init()
@@ -44,6 +48,7 @@ def _speaker_worker():
         text = _speaker_queue.get()
         try:
             if text is None:
+                # Sentinel value None signals clean worker shutdown.
                 break
             if engine is not None:
                 try:
@@ -51,15 +56,26 @@ def _speaker_worker():
                     engine.runAndWait()
                 except Exception:
                     # Keep the worker alive so a speech error does not break Jarvis.
-                    pass
+                    if hasattr(engine, "_inLoop") and getattr(engine, "_inLoop", False):
+                        try:
+                            engine.endLoop()
+                        except Exception:
+                            pass
         finally:
             _speaker_queue.task_done()
+
+    if engine is not None:
+        try:
+            engine.stop()
+        except Exception:
+            pass
 
 
 def _start_speaker():
     """Start the single speech worker when it is not already running."""
     global _speaker_thread
 
+    # Protect thread startup with a lock so only one speaker thread is created.
     with _speaker_lock:
         if _speaker_thread is None or not _speaker_thread.is_alive():
             _speaker_thread = threading.Thread(target=_speaker_worker, daemon=True)
@@ -68,13 +84,19 @@ def _start_speaker():
 
 def speak(text):
     """Queue text for the one thread that owns the speech engine."""
+    # Avoid starting threads or queuing speech when text is empty.
+    if text is None or not str(text).strip():
+        return
+    # Ensure the background speaker worker is running before queuing text.
     _start_speaker()
     _speaker_queue.put(str(text))
 
 
 def wait_until_done():
     """Block until queued speech has finished playing."""
+    # Block until all speech items in the queue have been fully processed.
     _speaker_queue.join()
+
 
 
 def shutdown():

@@ -43,7 +43,7 @@ def read_command(mode):
     voice.wait_until_done()
     print("Listening...")
     command = voice.listen()
-    if command is not None:
+    if command is not None and command.strip():
         return command
     if mode == "both":
         print("I couldn't hear you. Please type your command.")
@@ -59,9 +59,11 @@ def read_command(mode):
 def run():
     """Read commands in the configured mode and stop cleanly on exit or Ctrl+C."""
     setup_logging()
-    mode = config.MODE
+    # Normalize configured mode to lowercase and strip whitespace.
+    configured_mode = getattr(config, "MODE", "both")
+    mode = configured_mode.strip().lower() if isinstance(configured_mode, str) else "both"
     if mode not in {"voice", "typed", "both"}:
-        print(f"Unknown MODE '{mode}'. Using typed input.")
+        print(f"Unknown MODE '{configured_mode}'. Using typed input.")
         mode = "typed"
     speak_replies = mode in {"voice", "both"}
     print("Mini Jarvis is ready. Type 'exit' or 'quit' to stop.")
@@ -94,6 +96,7 @@ def run():
             voice.wait_until_done()
         finally:
             voice.shutdown()
+
 
 
 def main():

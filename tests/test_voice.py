@@ -84,6 +84,59 @@ class VoiceTests(unittest.TestCase):
         wait_for_speech.assert_called_once_with()
         shutdown.assert_called_once_with()
 
+    def test_listen_waits_for_speech_to_finish(self):
+        """Ensure listen calls wait_until_done before opening the microphone."""
+        with patch("voice.wait_until_done") as wait_speech:
+            with patch("voice._load_speech_recognition", side_effect=RuntimeError("stop")):
+                voice.listen()
+        wait_speech.assert_called_once_with()
+
+    def test_speak_skips_empty_or_none(self):
+        """Do not start background speaker thread or queue speech for empty text."""
+        with patch.object(voice, "_start_speaker") as start_speaker:
+            voice.speak(None)
+            voice.speak("")
+            voice.speak("   ")
+        start_speaker.assert_not_called()
+
+    def test_both_mode_uses_voice_when_recognized(self):
+        """Execute spoken command in both mode without prompting for typed input."""
+        with patch("main.config.MODE", "both"):
+            with patch("main.setup_logging"), patch("main.log_action"):
+                with patch("builtins.input") as typed_input:
+                    with patch("main.voice.listen", return_value="exit") as microphone:
+                        with patch("main.voice.wait_until_done"), patch("main.voice.speak") as speaker:
+                            with patch("main.voice.shutdown"):
+                                with patch("sys.stdout", new_callable=io.StringIO):
+                                    main.run()
+        microphone.assert_called_once_with()
+        typed_input.assert_not_called()
+        speaker.assert_called_once_with("Goodbye!")
+
+    def test_voice_mode_retries_on_silence(self):
+        """Voice-only mode speaks a prompt and continues listening when silence occurs."""
+        with patch("main.config.MODE", "voice"):
+            with patch("main.setup_logging"), patch("main.log_action"):
+                with patch("main.voice.listen", side_effect=[None, "exit"]) as microphone:
+                    with patch("main.voice.wait_until_done"), patch("main.voice.speak") as speaker:
+                        with patch("main.voice.shutdown"):
+                            with patch("sys.stdout", new_callable=io.StringIO):
+                                main.run()
+        self.assertEqual(microphone.call_count, 2)
+        speaker.assert_any_call("I couldn't hear you. Please try again.")
+        speaker.assert_any_call("Goodbye!")
+
+    def test_mode_case_insensitivity(self):
+        """Accept mode settings with different casing or surrounding whitespace."""
+        with patch("main.config.MODE", " BOTH "):
+            with patch("main.setup_logging"), patch("main.log_action"):
+                with patch("main.voice.listen", return_value="exit"):
+                    with patch("main.voice.wait_until_done"), patch("main.voice.speak"):
+                        with patch("main.voice.shutdown"):
+                            with patch("sys.stdout", new_callable=io.StringIO):
+                                main.run()
+
+
 
 if __name__ == "__main__":
     unittest.main()
