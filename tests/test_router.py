@@ -42,8 +42,10 @@ class RouterTests(unittest.TestCase):
     def test_update_does_not_trigger_date(self):
         """Avoid substring matching that mistakes update for a date command."""
         with patch("router.timeinfo.tell_date", return_value="DATE SKILL") as tell_date:
-            self.assertEqual(router.handle("update"), "I don't know that yet.")
+            with patch("router.ask_ai", return_value="AI RESPONSE") as ask_ai:
+                self.assertEqual(router.handle("update"), "AI RESPONSE")
         tell_date.assert_not_called()
+        ask_ai.assert_called_once_with([{"role": "user", "content": "update"}])
 
     def test_unknown_app_is_refused(self):
         """Do not pass unapproved names to the application launcher."""
@@ -83,10 +85,21 @@ class RouterTests(unittest.TestCase):
         self.assertIn("Opening youtube", reply)
 
     def test_punctuation_only_input_returns_fallback(self):
-        """Return fallback message instead of empty reply on punctuation input."""
+        """Send unknown non-empty input to the AI fallback."""
         for symbol_command in ("???", "!", "---"):
             with self.subTest(command=symbol_command):
-                self.assertEqual(router.handle(symbol_command), "I don't know that yet.")
+                with patch("router.ask_ai", return_value="AI RESPONSE") as ask_ai:
+                    self.assertEqual(router.handle(symbol_command), "AI RESPONSE")
+                ask_ai.assert_called_once_with([{"role": "user", "content": symbol_command}])
+
+    def test_known_command_does_not_call_ai(self):
+        """Keep known commands on their direct skill paths."""
+        with patch("router.ask_ai") as ask_ai:
+            with patch("skills.web.webbrowser.open"):
+                router.handle("open youtube")
+            router.handle("what's the time")
+            router.handle("what's the date")
+        ask_ai.assert_not_called()
 
     def test_none_input_does_not_crash(self):
         """Handle None input safely across router functions without raising."""

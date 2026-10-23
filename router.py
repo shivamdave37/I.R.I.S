@@ -1,9 +1,10 @@
-"""Match typed commands to the small set of Stage 1 skills."""
+"""Match commands to the configured skills and AI fallback."""
 
 import re
 
 import config
-from skills import apps, timeinfo, web
+from ai import ask_ai
+from skills import apps, news, timeinfo, web
 
 
 def normalize(command):
@@ -23,9 +24,9 @@ def is_exit_command(command):
 
 
 def fallback(command):
-    """Give a simple reply until the AI chat stage is built."""
-    # Unknown commands fall through here until AI chat is added in Stage 3.
-    return "I don't know that yet."
+    """Send unknown commands to the single configured AI chat function."""
+    # Keep provider details inside ai.py so routing stays independent of the AI service.
+    return ask_ai([{"role": "user", "content": command}])
 
 
 def handle(command):
@@ -54,6 +55,8 @@ def handle(command):
     # Direct date queries.
     if normalized in {"date", "what is the date", "whats the date", "tell me the date"}:
         return timeinfo.tell_date()
+    if normalized in {"news", "latest news"}:
+        return news.get_news()
 
     # Any other command, including punctuation-only input, goes to the fallback.
     return fallback(command)

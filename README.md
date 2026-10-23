@@ -1,13 +1,12 @@
-# Mini Jarvis — Stage 2
+# Mini Jarvis — Stage 3
 
-Stage 2 adds voice input and spoken replies to the typed Windows assistant. It opens approved websites and applications, tells the local time and date, and exits on request. AI chat, news, notes, GitHub actions, and Iris are later stages.
+Stage 3 adds AI chat and five-headline news to the voice-capable Windows assistant. It can still open approved websites and apps, tell the local time and date, and exit on request. Notes, GitHub actions, and Iris are later stages.
 
 ## Requirements
 
 - Windows 10 or 11
 - Python 3.10 or newer
-
-Install packages inside the project's virtual environment.
+- Internet for Gemini, RSS news, and online speech recognition; Ollama chat runs locally
 
 ## Setup and run
 
@@ -19,49 +18,59 @@ Install packages inside the project's virtual environment.
    .\venv\Scripts\Activate.ps1
    ```
 
-3. Install the project packages:
+3. Install packages:
 
    ```powershell
    python -m pip install -r requirements.txt
    ```
 
-4. Run Jarvis:
+4. Copy `.env.example` to `.env`. Create a free Gemini API key in [Google AI Studio](https://aistudio.google.com/apikey), then put it in `.env` as `GEMINI_API_KEY=your_real_key`. Never paste the key into chat or commit `.env`.
+5. Run Jarvis:
 
    ```powershell
    python main.py
    ```
 
-In the default `both` mode, Jarvis listens first and falls back to typed input if it cannot recognize speech. Set `MODE` in `config.py` to `voice` or `typed` to select one input mode. Replies are printed in every mode; voice and both modes also speak replies. Press Ctrl+C, or say/type `exit` or `quit`, to stop.
+`config.py` defaults to `AI_PROVIDER = "gemini"` and model `gemini-3.5-flash-lite`. The free Gemini tier has usage limits and Google may use free-tier prompts and responses to improve its products; do not send sensitive information. `AI_FALLBACK_PROVIDER` is `None` by default. Set it to `"ollama"` if you want a local fallback after Gemini reports a rate or quota limit.
+
+### Local Ollama option
+
+Install Ollama from [ollama.com](https://ollama.com), then open PowerShell and run:
+
+```powershell
+ollama run gemma3:1b
+```
+
+This downloads and starts the small `gemma3:1b` model. In `config.py`, set `AI_PROVIDER = "ollama"`. Ollama must be running locally at the configured `OLLAMA_URL` (`http://localhost:11434/api/chat`). No Gemini key is needed for Ollama.
 
 ## Commands
 
 - `open youtube`, `open google`, or `open github`
 - `open vscode`, `open chrome`, `open notepad`, or `open codex`
-- `time` or `what's the time`
-- `date` or `what's the date`
+- `time` / `what's the time`; `date` / `what's the date`
+- `news` or `latest news` (fetches up to five headlines from the configured BBC RSS feed)
+- Ask any other question to chat with the selected AI provider
 - `exit` or `quit`
 
-Only names listed in `config.py` can be opened. Before opening VS Code, Chrome, or Codex, check and edit the app paths in `config.py` for your computer. The sample VS Code and Codex paths contain `YOUR_USERNAME`; Jarvis will ask you to fix a sample path instead of trying to run it. Notepad can use the Windows `notepad.exe` command.
+Only names listed in `config.py` can be opened. Check the VS Code, Chrome, and Codex paths for your computer. In `both` mode, Jarvis listens first, then falls back to typed input if it cannot recognize speech. Set `MODE` in `config.py` to `voice` or `typed` to choose one input mode. Replies are printed in every mode; voice and both modes also speak replies.
 
-Unknown commands receive “I don't know that yet.” The `.env.example` file is included for the later AI stage; Stage 2 does not read an API key.
+## Microphone troubleshooting
 
-## Microphone troubleshooting on Windows
-
-- Check that Windows microphone privacy settings allow desktop apps to use the microphone, and select the intended input device as the Windows default.
-- PyAudio is included in `requirements.txt`. If installation fails, copy the error message into the chat before trying a different audio library or installing system build tools.
-- Speech recognition uses Google's online recognition service, so voice input needs an internet connection. Silence, microphone errors, and recognition/network failures return to typed input in `both` mode.
-- `pyttsx3` speaks offline using the installed Windows speech engine. Check Windows sound output and volume if no speech is audible.
+- Check Windows microphone privacy settings and the default input device.
+- If PyAudio installation fails, share the exact error before trying another audio library or installing system build tools.
+- Speech recognition uses an online service and needs internet. Silence, microphone errors, and recognition/network failures return to typed input in `both` mode.
+- `pyttsx3` speaks offline using the installed Windows speech engine.
 
 ## Tests
 
-Run the unit tests with:
+Run all unit tests with:
 
 ```powershell
 python -m unittest discover tests
 ```
 
-Tests mock browser, app, microphone, and speaker behavior, so they do not open real programs or use audio hardware.
+Tests mock the AI providers and RSS network request; they do not use a real API key, network, microphone, or speaker.
 
-## Logs
+## Logs and privacy
 
-Jarvis writes command and result entries to `logs/jarvis.log`. If it cannot create or write the log, it continues running. The `logs/` folder is ignored by Git.
+Jarvis writes command and result entries to `logs/jarvis.log` and redacts the configured Gemini key. If the log cannot be written, the assistant continues. `.env`, logs, and the virtual environment are ignored by Git. AI providers receive the chat text and the fixed assistant instructions, not `.env` contents or local files. The news skill requests only the configured public RSS feed.

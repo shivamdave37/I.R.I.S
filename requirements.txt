@@ -1,3 +1,7 @@
 SpeechRecognition
 pyttsx3
 PyAudio
+google-genai
+python-dotenv
+requests
+feedparser

@@ -2,7 +2,12 @@
 
 MODE = "both"
 AI_PROVIDER = "gemini"
+AI_FALLBACK_PROVIDER = None
 USE_IRIS = False
+GEMINI_MODEL = "gemini-3.5-flash-lite"
+OLLAMA_MODEL = "gemma3:1b"
+OLLAMA_URL = "http://localhost:11434/api/chat"
+NEWS_RSS_URL = "https://feeds.bbci.co.uk/news/rss.xml"
 
 WEBSITES = {
     "youtube": "https://www.youtube.com",

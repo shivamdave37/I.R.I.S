@@ -6,6 +6,7 @@ import os
 import config
 import router
 import voice
+from dotenv import load_dotenv
 
 
 def setup_logging():
@@ -27,6 +28,12 @@ def setup_logging():
 def log_action(command, result):
     """Record a command and its result while keeping logging failures harmless."""
     try:
+        # Redact the configured key before writing user input or errors to disk.
+        load_dotenv()
+        api_key = os.getenv("GEMINI_API_KEY")
+        if api_key:
+            command = str(command).replace(api_key, "[REDACTED]")
+            result = str(result).replace(api_key, "[REDACTED]")
         # Log command and outcome for audit and debugging purposes.
         logging.info("command=%r | result=%r", command, result)
     except Exception:
