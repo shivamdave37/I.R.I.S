@@ -61,4 +61,10 @@ See `README.md` for setup details and the available commands.
 
 ## Reviewer findings
 
-(Reviewer: append findings and any fixes here.)
+- **Whitespace collapsing**: Commands with extra spaces between words (such as `"what's   the   time"` or `"open   youtube"`) previously failed to match because `router.normalize()` preserved internal multi-spaces. Updated `router.normalize()` to collapse multi-spaces, adhering strictly to SPEC.md section 4.
+- **Punctuation-only input**: Punctuation-only inputs (like `"???"` or `"!"`) were reduced to `""`, causing `router.handle()` to return an empty string and Jarvis to print an empty line (`Jarvis: `). Fixed to return the fallback response `"I don't know that yet."` for any unrecognized non-empty input.
+- **Safe empty/None handling**: `router.normalize(None)`, `router.handle(None)`, and `router.is_exit_command(None)` previously raised `AttributeError`. Added safeguards returning `""` and `False` safely without crashing.
+- **Browser launch failure check**: `webbrowser.open()` returns `False` if browser launching fails. `skills/web.py` now checks for `False` and returns a friendly error message instead of falsely reporting success.
+- **Windows log encoding**: Added `encoding="utf-8"` to `logging.basicConfig()` in `main.py` to prevent potential `UnicodeEncodeError` on Windows when recording non-ASCII commands.
+- **Documentation & WHY-comments**: Added missing "why" comments to functions across `router.py`, `main.py`, and `skills/` to satisfy AGENTS.md rule 10.
+- **Unit test suite expansion**: Added 8 new unit tests in `tests/test_router.py` covering multi-space commands, punctuation-only fallback, None-safety, browser failure handling, placeholder/missing app checks, launch exceptions, and logging execution (16 tests total, all passing).
