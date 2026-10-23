@@ -59,7 +59,8 @@ class RouterTests(unittest.TestCase):
                 command_input = patch("builtins.input", side_effect=[word, "should not run"])
                 with command_input as mocked_input, patch("sys.stdout", new_callable=io.StringIO):
                     with patch("main.setup_logging"), patch("main.log_action"):
-                        main.run()
+                        with patch("main.config.MODE", "typed"):
+                            main.run()
                 self.assertEqual(mocked_input.call_count, 1)
 
     def test_empty_input_is_ignored(self):
@@ -68,7 +69,8 @@ class RouterTests(unittest.TestCase):
             with patch("sys.stdout", new_callable=io.StringIO):
                 with patch("main.setup_logging"), patch("main.log_action"):
                     with patch("main.router.handle", wraps=router.handle) as handle:
-                        main.run()
+                        with patch("main.config.MODE", "typed"):
+                            main.run()
         handle.assert_called_once_with("exit")
 
     def test_commands_ignore_extra_whitespace(self):

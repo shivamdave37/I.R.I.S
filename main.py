@@ -3,7 +3,9 @@
 import logging
 import os
 
+import config
 import router
+import voice
 
 
 def setup_logging():
@@ -32,30 +34,66 @@ def log_action(command, result):
         pass
 
 
+def read_command(mode):
+    """Read from the microphone first when the selected mode uses voice."""
+    if mode == "typed":
+        return input("You: ")
+
+    # Wait so Jarvis never listens to its own speech through the microphone.
+    voice.wait_until_done()
+    print("Listening...")
+    command = voice.listen()
+    if command is not None:
+        return command
+    if mode == "both":
+        print("I couldn't hear you. Please type your command.")
+        return input("You: ")
+
+    # Voice-only mode retries after a short spoken prompt instead of crashing.
+    message = "I couldn't hear you. Please try again."
+    print(f"Jarvis: {message}")
+    voice.speak(message)
+    return None
+
+
 def run():
-    """Read typed commands and stop cleanly on exit or Ctrl+C."""
+    """Read commands in the configured mode and stop cleanly on exit or Ctrl+C."""
     setup_logging()
+    mode = config.MODE
+    if mode not in {"voice", "typed", "both"}:
+        print(f"Unknown MODE '{mode}'. Using typed input.")
+        mode = "typed"
+    speak_replies = mode in {"voice", "both"}
     print("Mini Jarvis is ready. Type 'exit' or 'quit' to stop.")
-    while True:
+    try:
+        while True:
+            try:
+                # The mode helper keeps voice and typed input behavior in one place.
+                command = read_command(mode)
+            except (EOFError, KeyboardInterrupt):
+                # Clean exit on Ctrl+C or end-of-file stream without crashing.
+                print("\nJarvis: Goodbye!")
+                if speak_replies:
+                    voice.speak("Goodbye!")
+                log_action("<interrupted>", "stopped")
+                break
+
+            if command is None or not command.strip():
+                continue
+
+            reply = router.handle(command)
+            print(f"Jarvis: {reply}")
+            log_action(command, reply)
+            if speak_replies:
+                voice.speak(reply)
+            # Stop loop after the goodbye reply has been queued.
+            if router.is_exit_command(command):
+                break
+    finally:
         try:
-            # Read user command from standard input.
-            command = input("You: ")
-        except (EOFError, KeyboardInterrupt):
-            # Clean exit on Ctrl+C or end-of-file stream without crashing.
-            print("\nJarvis: Goodbye!")
-            log_action("<interrupted>", "stopped")
-            break
-
-        # Ignore empty or blank inputs.
-        if not command.strip():
-            continue
-
-        reply = router.handle(command)
-        print(f"Jarvis: {reply}")
-        log_action(command, reply)
-        # Stop loop if exit or quit command was received.
-        if router.is_exit_command(command):
-            break
+            voice.wait_until_done()
+        finally:
+            voice.shutdown()
 
 
 def main():
