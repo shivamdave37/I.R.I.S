@@ -379,5 +379,17 @@ class MainIntegrationTests(unittest.TestCase):
         self.assertIn("after 5 minutes it scores 0", output.getvalue())
         self.assertIn("paused at step 1, resources released=True, final state=DONE", output.getvalue())
 
+    def test_admin_audit_logged_without_task(self):
+        """Admin-only events like status and grants must write a log entry."""
+        import logging
+        supervisor = Iris()
+        try:
+            with self.assertLogs("root", level="INFO") as log_capture:
+                supervisor._audit(None, "admin status")
+            # The log must contain 'admin' as the task_id, not raise AttributeError.
+            self.assertTrue(any("admin" in line for line in log_capture.output))
+        finally:
+            supervisor.stop()
+
 if __name__ == "__main__":
     unittest.main()

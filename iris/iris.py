@@ -431,6 +431,9 @@ class Iris:
     def _audit(self, task, event):
         """Write a task event and identifier to the configured audit log."""
         try:
-            logging.info("task_id=%s | task=%r | %s", task.id, task.name, event)
+            # Use 'admin' as the id when the event is not tied to a specific task.
+            task_id = task.id if task is not None else "admin"
+            task_name = task.name if task is not None else "admin"
+            logging.info("task_id=%s | task=%r | %s", task_id, task_name, event)
         except Exception:
             pass
