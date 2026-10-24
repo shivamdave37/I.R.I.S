@@ -10,6 +10,7 @@ This file is read by BOTH OpenAI Codex and Google Antigravity. The human owner i
 ## 2. One agent at a time
 - Before doing anything, read SPEC.md, then HANDOFF.md.
 - If HANDOFF.md says it is not your turn, stop and tell the human. Do not work.
+- Exception: Stage 6 may relax hard limit 6 only as written in SPEC.md section 12.
 - Never edit files at the same time as the other agent.
 
 ## 3. Rules for BOTH agents
