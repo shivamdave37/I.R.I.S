@@ -80,9 +80,15 @@ Install packages into the project virtual environment with `python -m pip instal
 
 ### Stage 4 builder notes
 - Added clipboard explain/fix commands, typed yes/no confirmation, notes, name/preferences and 20-command memory, and a fixed Git command flow with separate typed approvals.
-- Stage 4 unit tests mock AI, clipboard, confirmation, persistence paths, and Git subprocesses.
-### Stage 4 builder notes
-- Added clipboard explain/fix commands, typed yes/no confirmation, notes, name/preferences and 20-command memory, and a fixed Git command flow with separate typed approvals.
 - Fix suggestions are not pasted, run, or written to disk/logs. API keys are redacted from persistent command history and rejected in commit messages.
-- Stage 4 unit tests mock AI, clipboard, confirmation, persistence paths, and Git subprocesses. The suite passed 58 tests.
+- Stage 4 unit tests mock AI, clipboard, confirmation, persistence paths, and Git subprocesses. The builder suite passed 58 tests.
 - Manual testing still needs an actual Windows selection and optional GitHub login/push.
+
+### Stage 4 reviewer findings
+- Made explanation speech respect `MODE`, so typed mode stays silent while voice modes speak a short summary.
+- Handled EOF/Ctrl+C at the commit-message prompt so interruption does not escape the command loop.
+- Git failures return a safe, useful status without echoing raw remote errors that could contain credentials. Git action logs include only the fixed action and exit code.
+- Confirmed suggested fixes are not pasted, run, saved, or included in persistent logs; clipboard content is only sent to `ask_ai()` as data.
+- Confirmed Git execution uses only list arguments for `status`, `add`, `commit`, and `push`, with a fixed project working directory and typed approval before mutations.
+- Verified `.env` is not tracked and found no API-key-shaped string in source/history search.
+- Full suite: 60 tests passed. Real clipboard, microphone/speaker, and GitHub login/push checks remain for the human.

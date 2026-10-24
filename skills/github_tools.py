@@ -49,7 +49,11 @@ def save_to_github():
     if add_result.returncode != 0:
         return f"Git add failed with exit code {add_result.returncode}."
 
-    message = input("Commit message: ").strip()
+    try:
+        message = input("Commit message: ").strip()
+    except (EOFError, KeyboardInterrupt):
+        # Keep an interrupted prompt from escaping and crashing the assistant loop.
+        return "No commit message was entered. Changes are staged but not committed."
     if not message:
         return "No commit message was entered. Changes are staged but not committed."
     # Reject a secret in the commit message before it can enter Git history.

@@ -5,6 +5,7 @@ import time
 import pyautogui
 import pyperclip
 
+import config
 from ai import ask_ai
 import voice
 
@@ -26,7 +27,9 @@ def explain_code():
     selected_text = _copy_selection()
     if not selected_text.strip():
         message = "I couldn't read selected code from the clipboard."
-        voice.speak(message)
+        # Typed mode stays quiet, matching the existing input/output setting.
+        if str(config.MODE).strip().lower() in {"voice", "both"}:
+            voice.speak(message)
         return message
 
     # Mark copied text as data so it cannot issue commands or change settings.
@@ -37,7 +40,9 @@ def explain_code():
     )
     explanation = ask_ai(prompt)
     summary = explanation.splitlines()[0][:180] if explanation else "I couldn't explain that code."
-    voice.speak(summary)
+    # Only voice modes speak the summary; typed mode prints the complete reply.
+    if str(config.MODE).strip().lower() in {"voice", "both"}:
+        voice.speak(summary)
     return explanation
 
 

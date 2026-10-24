@@ -52,6 +52,16 @@ class CodeHelperTests(unittest.TestCase):
         self.assertEqual(reply, "It prints hello.\nMore detail.")
         speak.assert_called_once_with("It prints hello.")
 
+    def test_explain_stays_silent_in_typed_mode(self):
+        """Keep the typed-only mode from speaking an explanation summary."""
+        with patch("skills.code_helper.config.MODE", "typed"):
+            with patch("skills.code_helper.pyautogui.hotkey"), patch("skills.code_helper.time.sleep"):
+                with patch("skills.code_helper.pyperclip.paste", return_value="print('hello')"):
+                    with patch("skills.code_helper.ask_ai", return_value="It prints hello."):
+                        with patch("skills.code_helper.voice.speak") as speak:
+                            code_helper.explain_code()
+        speak.assert_not_called()
+
     def test_fix_displays_suggestion_without_writing_or_running(self):
         """Keep a suggested fix on screen without file writes or process execution."""
         with patch("skills.code_helper.pyautogui.hotkey"):
@@ -100,6 +110,17 @@ class GithubToolTests(unittest.TestCase):
         self.assertEqual([call.args[0] for call in run_git.call_args_list], [
             ["status", "--short"], ["add", "-A"], ["commit", "-m", "Stage 4 test commit"]
         ])
+
+    def test_interrupting_commit_message_does_not_crash(self):
+        """Return safely when the user interrupts the message prompt."""
+        status = Mock(returncode=0, stdout=" M main.py\n", stderr="")
+        successful = Mock(returncode=0, stdout="", stderr="")
+        with patch("skills.github_tools._run_git", side_effect=[status, successful]) as run_git:
+            with patch("skills.github_tools.ask_yes_no", return_value=True):
+                with patch("builtins.input", side_effect=KeyboardInterrupt):
+                    reply = github_tools.save_to_github()
+        self.assertIn("not committed", reply)
+        self.assertEqual([call.args[0] for call in run_git.call_args_list], [["status", "--short"], ["add", "-A"]])
 
     def test_git_failure_does_not_echo_remote_credentials(self):
         """Keep raw Git errors out of replies because remotes may contain credentials."""

@@ -32,7 +32,7 @@ For local AI chat, install [Ollama](https://ollama.com), run `ollama run gemma3:
 - `time` / `what's the time`; `date` / `what's the date`
 - `news`, `latest news`, or `tell me the news`
 - Ask any other question to chat with the selected AI provider
-- `explain this code`: select code in another app, then ask Jarvis. It copies the selection, prints the explanation, and speaks a short summary.
+- `explain this code`: select code in another app, then ask Jarvis. It copies the selection and prints the explanation; voice modes also speak a short summary.
 - `fix this code`: select code, then ask Jarvis. It displays an AI suggestion only; Jarvis does not paste, save, or run it.
 - `take a note <text>` and `show my notes`
 - `my name is <name>`, `remember I prefer <preference>`, and `what do you remember about me`
