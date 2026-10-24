@@ -1,8 +1,8 @@
-TURN: human
-STAGE: 4
+TURN: reviewer
+STAGE: 5
 ROUND: 0
-BUILDER NOTES: Stage 4 builder commit 5bf5aba (`stage-4`) implemented clipboard explain/fix, confirmation, GitHub save, notes, and memory.
-UNSURE ABOUT: Real clipboard selection and pyautogui behavior need a human Windows check. Actual GitHub login/push was not tested. Stage 3 real Gemini/Ollama/RSS checks and Stage 2 mic/speaker/app-path checks remain pending.
-REVIEWER FIXED: Made explanation speech respect MODE; handled EOF/Ctrl+C while asking for a commit message; made Git errors/logs avoid raw credential-bearing remote text; added tests for these cases. Verified AI code fixes stay display-only and are not persisted in logs, and Git subprocess calls use only list arguments, approved verbs, typed approvals, and the fixed project folder. `.env` is not tracked; source/history search found no API-key-shaped string. All 60 unit tests pass.
+BUILDER NOTES: Stage 5A core, 5B controls/permissions, and 5C demo/docs are implemented. Codex self-review is authorized because Antigravity is unavailable. Full suite: 82 tests passed; demo and compile checks passed.
+UNSURE ABOUT: Actual Windows microphone/speaker interaction, app paths, live provider behavior, clipboard, and GitHub authentication cannot be verified here. Iris intentionally runs one task at a time to keep all interactive prompts on one keyboard queue.
+REVIEWER FIXED: None.
 REVIEWER UNRESOLVED (needs builder or human): None.
-NEEDS HUMAN TEST (mic, speakers, app paths, clipboard, GitHub login): Select harmless code and try explain/fix; verify explain prints the full result and speaks a short summary in voice mode, while typed mode stays silent; verify fix only displays the suggestion. Save/show notes, save a name and preference, and ask what Jarvis remembers. Try the Git flow by declining each typed approval; only try a real commit/push when you intend to publish the listed changes. Stage 3 Gemini, Ollama, RSS, and offline checks plus Stage 2 microphone, speaker, and app paths remain to be checked.
+NEEDS HUMAN TEST (mic, speakers, app paths, clipboard, GitHub login): Enable USE_IRIS in config.py; test voice and typed inputs, permission allow/deny/timeout, saved grants/revoke, admin controls, pause/resume/cancel/stop all, allowed apps, Git confirmations, and GitHub only if you intend to publish. Stage 1-4 real microphone/speaker, app paths, AI providers/RSS, clipboard, and GitHub login checks remain outstanding.

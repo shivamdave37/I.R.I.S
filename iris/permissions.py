@@ -7,6 +7,7 @@ import threading
 import time
 
 import config
+from iris.console import input_broker
 
 
 SENSITIVE_RESOURCES = {"GIT_REPO", "SCREEN_FOCUS", "NOTES_FILE"}
@@ -65,29 +66,29 @@ class PermissionManager:
             ask_resources.append(resource)
         if not ask_resources:
             return True
-        event = threading.Event()
-        with self._lock:
-            self._pending = {"task": task, "items": reasons, "event": event, "answer": None}
-        print(f"Task {task.id}: {task.name} wants:")
+        prompt_text = f"Task {task.id}: {task.name} wants:\n"
         for index, (resource, reason, _) in enumerate(reasons, 1):
             policy = "typed yes required every time" if resource in SENSITIVE_RESOURCES else "once/session/always/deny"
-            print(f"  [{index}] {resource} - {reason} ({policy})")
-        print("Type one choice per item in order, separated by commas (sensitive items: type yes or deny).")
-        self._audit(task, "permission request shown: " + ", ".join(ask_resources))
-        deadline = time.monotonic() + self.timeout
-        approved = False
-        while time.monotonic() < deadline and not task.cancel_event.is_set():
-            if event.wait(min(0.1, deadline - time.monotonic())):
-                approved = True
-                break
+            prompt_text += f"  [{index}] {resource} - {reason} ({policy})\n"
+        prompt_text += "Type one choice per item in order, separated by commas (sensitive items: type yes or deny).\nPermission choices: "
+        prompt = input_broker.create_request(prompt_text, kind="permission")
         with self._lock:
-            answer = self._pending.get("answer") if self._pending and self._pending["event"] is event else None
-            if self._pending and self._pending["event"] is event:
+            self._pending = {"task": task, "items": reasons, "prompt_id": prompt["id"]}
+        self._audit(task, "permission request shown: " + ", ".join(ask_resources))
+        input_broker.enqueue(prompt)
+        answer_text = input_broker.wait_for_answer(prompt, self.timeout)
+        with self._lock:
+            if self._pending and self._pending["prompt_id"] == prompt["id"]:
                 self._pending = None
-        if not approved or answer is None:
+        if answer_text is None or task.cancel_event.is_set():
             self._audit(task, "permission timeout or no answer: denied")
             return False
-        choices = answer
+        choices = [item.strip().lower() for item in answer_text.split(",")]
+        if len(choices) != len(reasons):
+            self._audit(task, "invalid permission response denied")
+            return False
+        choices = ["once" if resource in SENSITIVE_RESOURCES and choice == "yes" else choice
+                   for (resource, _, _), choice in zip(reasons, choices)]
         for (resource, _, _), choice in zip(reasons, choices):
             self._audit(task, f"permission answer {resource}={choice}")
         if any(choice == "deny" for choice in choices):
@@ -95,18 +96,21 @@ class PermissionManager:
         if any(resource in SENSITIVE_RESOURCES and choice != "once"
                for (resource, _, _), choice in zip(reasons, choices)):
             return False
+        new_session_grants = set()
+        new_saved_grants = set(self._saved_grants)
         for (resource, _, grant_key), choice in zip(reasons, choices):
             if choice == "session":
-                self._session_grants.add(grant_key)
+                new_session_grants.add(grant_key)
             elif choice == "always":
-                previous_grants = set(self._saved_grants)
-                self._saved_grants.add(grant_key)
-                try:
-                    self._save()
-                except OSError:
-                    self._saved_grants = previous_grants
-                    self._audit(task, "failed to persist grant")
-                    return False
+                new_saved_grants.add(grant_key)
+        if new_saved_grants != self._saved_grants:
+            try:
+                self._save(new_saved_grants)
+            except OSError:
+                self._audit(task, "failed to persist grant")
+                return False
+        self._saved_grants = new_saved_grants
+        self._session_grants.update(new_session_grants)
         return True
 
     def pending_prompt(self):
@@ -125,18 +129,14 @@ class PermissionManager:
             raw_choices = [item.strip().lower() for item in text.split(",")]
             if len(raw_choices) != len(pending["items"]):
                 return False
-            choices = []
             for (resource, _, _), choice in zip(pending["items"], raw_choices):
-                if resource in SENSITIVE_RESOURCES and choice == "yes":
-                    choice = "once"
-                if resource in SENSITIVE_RESOURCES and choice not in {"once", "deny"}:
+                if resource in SENSITIVE_RESOURCES and choice not in {"yes", "deny"}:
                     return False
                 if resource not in SENSITIVE_RESOURCES and choice not in {"once", "session", "always", "deny"}:
                     return False
-                choices.append(choice)
-            pending["answer"] = choices
-            pending["event"].set()
-            return True
+            prompt_id = pending["prompt_id"]
+        input_broker.pending()
+        return input_broker.answer(prompt_id, text, typed=typed)
 
     def grants(self):
         """Return the saved grant labels for the grants admin command."""
@@ -156,13 +156,14 @@ class PermissionManager:
         self._audit(None, f"grant revoked: {resource}")
         return bool(matches)
 
-    def _save(self):
+    def _save(self, grants=None):
         """Persist non-sensitive grants without writing outside the project data folder."""
         os.makedirs(self.data_folder, exist_ok=True)
         # A temporary file plus replace avoids partially written permission state.
         temporary_path = self.path + ".tmp"
+        saved_grants = self._saved_grants if grants is None else grants
         with open(temporary_path, "w", encoding="utf-8") as permission_file:
-            json.dump({grant: "always" for grant in sorted(self._saved_grants)}, permission_file, indent=2)
+            json.dump({grant: "always" for grant in sorted(saved_grants)}, permission_file, indent=2)
         os.replace(temporary_path, self.path)
 
     @staticmethod

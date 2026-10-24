@@ -2,6 +2,8 @@
 
 import logging
 import os
+import sys
+import time
 
 import config
 import router
@@ -22,6 +24,39 @@ def _is_rules_change(command):
     """Refuse runtime requests that try to alter fixed config or safety rules."""
     normalized = router.normalize(command)
     return any(term in normalized for term in ("hard limit", "safety rule", "approved apps", "allowed resources", "configpy"))
+
+
+def read_console_line(prompt, yield_if=None):
+    """Read one keyboard line without starting a second stdin reader thread."""
+    try:
+        import msvcrt
+    except ImportError:
+        return input(prompt)
+    print(prompt, end="", flush=True)
+    line = ""
+    while True:
+        if not line and yield_if and yield_if():
+            print()
+            return None
+        if msvcrt.kbhit():
+            character = msvcrt.getwch()
+            if character in {"\r", "\n"}:
+                print()
+                return line
+            if character == "\003":
+                raise KeyboardInterrupt
+            if character == "\b":
+                if line:
+                    line = line[:-1]
+                    print("\b \b", end="", flush=True)
+            elif character in {"\x00", "\xe0"}:
+                # Consume the second byte of a Windows function-key sequence.
+                msvcrt.getwch()
+            else:
+                line += character
+                print(character, end="", flush=True)
+        else:
+            time.sleep(0.02)
 
 
 def _iris_result(task, speak_replies):
@@ -50,41 +85,73 @@ def run_iris(mode):
     supervisor.permission_manager = permission_manager
     input_broker.enabled = True
     print("Iris supervision is enabled. Type or say 'status' to inspect tasks.")
+    deferred_command = None
+    deferred_is_typed = False
+
+    def prompt_is_pending():
+        """Check both serialized sources before waiting for another command."""
+        return bool(supervisor.pending_permission_prompt() or input_broker.pending())
+
     try:
         while True:
             pending_console = input_broker.pending()
             if pending_console:
                 request_id, prompt = pending_console
+                prompt_kind = input_broker.kind(request_id)
+                def console_prompt_expired():
+                    """Check whether the worker stopped waiting for this input."""
+                    return input_broker.pending() != pending_console
                 try:
-                    answer = input(prompt)
+                    answer = read_console_line(prompt, console_prompt_expired)
                 except (EOFError, KeyboardInterrupt):
                     input_broker.answer(request_id, None, typed=True)
                     break
+                if answer is None:
+                    continue
                 if _is_admin_command(answer):
                     print(supervisor.handle_admin(answer))
+                elif prompt_kind == "permission":
+                    permission = supervisor.pending_permission_prompt()
+                    if permission is None or not supervisor.answer_permission(permission[0], answer, typed=True):
+                        print("That answer did not match the permission prompt. Try again or type deny for each item.")
                 elif not input_broker.answer(request_id, answer, typed=True):
                     print("That prompt is no longer active.")
                 continue
-            pending = supervisor.pending_permission_prompt()
-            if pending:
-                task_id, _ = pending
-                try:
-                    # Permission answers are typed so spoken voices cannot approve sensitive work.
-                    answer = input(f"Permission choices for task {task_id}: ")
-                except (EOFError, KeyboardInterrupt):
-                    supervisor.answer_permission(task_id, "deny", typed=True)
-                    break
-                if _is_admin_command(answer):
-                    print(supervisor.handle_admin(answer))
-                elif not supervisor.answer_permission(task_id, answer, typed=True):
-                    print("That answer did not match the permission prompt. Try again or type deny for each item.")
-                continue
 
             try:
-                command = read_command(mode)
+                if deferred_command is not None:
+                    command = deferred_command
+                    deferred_command = None
+                    typed_command = deferred_is_typed
+                    deferred_is_typed = False
+                elif mode == "typed":
+                    command = read_console_line("You: ", prompt_is_pending)
+                    typed_command = True
+                else:
+                    voice.wait_until_done()
+                    print("Listening...")
+                    command = voice.listen()
+                    typed_command = False
+                    if command is None and mode == "both":
+                        print("I couldn't hear you. Please type your command.")
+                        command = read_console_line("You: ", prompt_is_pending)
+                        typed_command = True
+                    elif command is None:
+                        message = "I couldn't hear you. Please try again."
+                        print(f"Jarvis: {message}")
+                        voice.speak(message)
             except (EOFError, KeyboardInterrupt):
                 print("\nJarvis: Goodbye!")
                 break
+            # A voice phrase is never treated as permission input.
+            pending = supervisor.pending_permission_prompt()
+            if pending and command and not _is_admin_command(command):
+                if typed_command and supervisor.answer_permission(pending[0], command, typed=True):
+                    continue
+                if command.strip().lower() not in {"yes", "y", "no", "n", "once", "session", "always", "deny"}:
+                    deferred_command = command
+                    deferred_is_typed = typed_command
+                continue
             if command is None or not command.strip():
                 continue
             if router.is_exit_command(command):

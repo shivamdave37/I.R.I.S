@@ -60,10 +60,12 @@ class Iris:
         task_id = next(self._counter)
         task_name = self._safe_task_name(name or command.strip() or "empty command")
         try:
-            planned = agent_planner.plan(command)
             needed, allowed = agent_permissions.inspect(command)
             if not allowed:
                 raise ValueError("The command requested an unknown resource.")
+            planned = agent_planner.plan(command)
+            # Keep Agent 1's fixed requirements and include any validated extra needs from Agent 2.
+            needed = sorted(set(needed) | set(planned["resources"]))
             task = Task(task_id, task_name, command, priority=priority,
                         needed_resources=needed, plan=planned["steps"],
                         estimated_time=planned["estimate_seconds"], timeout_seconds=self._task_timeout)
@@ -151,7 +153,7 @@ class Iris:
             with self._confirmation_lock:
                 return self._permission_callback(task)
         except Exception as error:
-            self._audit(task, f"permission workflow failed safely: {error}")
+            self._audit(task, f"permission workflow failed safely: {type(error).__name__}")
             return False
 
     def pending_permission_prompt(self):
@@ -189,8 +191,8 @@ class Iris:
         except Exception as error:
             # A worker failure is visible to status instead of disappearing in a thread.
             task.state = TaskState.FAILED
-            task.error = str(error)
-            logging.exception("Iris task %s failed", task.id)
+            task.error = self._safe_task_name(str(error))
+            logging.error("Iris task %s failed with %s", task.id, type(error).__name__)
         finally:
             task.actual_time = max(0, time.monotonic() - task.started_at)
             if task.state in {TaskState.DONE, TaskState.FAILED, TaskState.CANCELLED}:
@@ -199,8 +201,8 @@ class Iris:
             if self._result_callback and task.state in {TaskState.DONE, TaskState.FAILED}:
                 try:
                     self._result_callback(task)
-                except Exception:
-                    logging.exception("Iris result callback failed for task %s", task.id)
+                except Exception as error:
+                    logging.error("Iris result callback failed for task %s with %s", task.id, type(error).__name__)
             # Hold resources through queued speech so another task cannot overlap the speaker.
             self.resources.release(task)
             with self._condition:

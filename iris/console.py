@@ -18,11 +18,48 @@ class InputBroker:
 
     def request(self, prompt, timeout=60):
         """Wait for the main loop to collect one typed answer."""
-        request = {"id": next(self._counter), "prompt": prompt, "event": threading.Event(), "answer": None}
+        request = self.create_request(prompt)
+        self.enqueue(request)
+        return self.wait_for_answer(request, timeout)
+
+    def create_request(self, prompt, kind="confirmation"):
+        """Create a typed prompt record before making it visible to the input loop."""
+        return {"id": next(self._counter), "prompt": prompt, "kind": kind, "event": threading.Event(), "answer": None}
+
+    def enqueue(self, request):
+        """Add a prepared prompt to the shared confirmation queue."""
         self._requests.put(request)
+
+    def wait_for_answer(self, request, timeout=60):
+        """Wait a bounded time for the main loop to answer a prepared request."""
         if not request["event"].wait(timeout):
+            self._remove_request(request["id"])
             return None
         return request["answer"]
+
+    def kind(self, request_id):
+        """Return the active prompt kind so the main loop can route its answer."""
+        with self._lock:
+            if self._active and self._active["id"] == request_id:
+                return self._active["kind"]
+        return None
+
+    def _remove_request(self, request_id):
+        """Remove an expired prompt so the main loop cannot display stale input."""
+        with self._lock:
+            if self._active and self._active["id"] == request_id:
+                self._active = None
+                return
+            kept = []
+            while True:
+                try:
+                    request = self._requests.get_nowait()
+                except queue.Empty:
+                    break
+                if request["id"] != request_id:
+                    kept.append(request)
+            for request in kept:
+                self._requests.put(request)
 
     def pending(self):
         """Return the current keyboard prompt or promote the next queued prompt."""

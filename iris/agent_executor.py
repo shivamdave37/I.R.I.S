@@ -9,8 +9,7 @@ def execute(task, iris):
             return "cancelled"
         if not iris.pause_checkpoint(task):
             return "cancelled"
-        # One user command remains one action even when a planner returns several steps.
-        if task.current_step == 0:
-            task.result = router.handle(task.command_text)
+        # Execute one approved skill step, then check control flags before the next.
+        task.result = router.handle(task.command_text)
         task.current_step += 1
     return task.result
