@@ -120,7 +120,12 @@ class Iris:
             if chosen:
                 # Permission waits happen outside the scheduler lock so admin controls stay live.
                 if chosen.id not in self._permission_results:
-                    if not self._permission_allowed(chosen):
+                    chosen.permission_waiting = True
+                    try:
+                        permitted = self._permission_allowed(chosen)
+                    finally:
+                        chosen.permission_waiting = False
+                    if not permitted:
                         if chosen.state == TaskState.CANCELLED or chosen.cancel_event.is_set():
                             continue
                         chosen.state = TaskState.CANCELLED
@@ -213,6 +218,13 @@ class Iris:
         while not self.stop_event.wait(0.1):
             now = time.monotonic()
             for task in list(self.tasks.values()):
+                if (task.state == TaskState.QUEUED and not task.permission_waiting
+                        and now - task.created_at > task.timeout_seconds):
+                    task.cancel_event.set()
+                    task.state = TaskState.CANCELLED
+                    task.error = "Task timed out while queued."
+                    task.finished_at = now
+                    self._audit(task, "queue timeout cancelled")
                 if (task.state == TaskState.WAITING and task.authorized_at
                         and now - task.authorized_at > task.timeout_seconds):
                     task.cancel_event.set()
@@ -226,7 +238,7 @@ class Iris:
                     task.state = TaskState.CANCELLED
                     task.error = "Task timed out."
                     task.finished_at = now
-                    self.resources.release(task)
+                    # Keep ownership until a blocked worker exits; Python cannot kill its thread.
                     self._audit(task, "timeout cancelled")
 
     def status(self):
@@ -404,7 +416,9 @@ class Iris:
             if task.state in {TaskState.QUEUED, TaskState.WAITING, TaskState.RUNNING, TaskState.PAUSED}:
                 task.cancel_event.set()
                 task.state = TaskState.CANCELLED
-                self.resources.release(task)
+                worker = self._worker_threads.get(task.id)
+                if worker is None or not worker.is_alive():
+                    self.resources.release(task)
         with self._condition:
             self._condition.notify_all()
         deadline = time.monotonic() + timeout

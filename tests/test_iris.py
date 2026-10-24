@@ -89,19 +89,28 @@ class IrisTests(unittest.TestCase):
     def test_timeout_cancels_and_releases_resource(self):
         """The watchdog cancels an overdue task and frees its reservation."""
         supervisor = Iris(task_timeout=0.05)
+        started = threading.Event()
+        release_block = threading.Event()
         try:
             def block(command):
                 """Hold a mocked skill long enough for the watchdog to catch it."""
-                time.sleep(0.15)
+                started.set()
+                release_block.wait(1)
                 return "late"
             with patch("router.handle", side_effect=block):
                 task = supervisor.submit("latest news")
+                self.assertTrue(started.wait(1))
                 deadline = time.monotonic() + 1
                 while task.state != TaskState.CANCELLED and time.monotonic() < deadline:
                     time.sleep(0.01)
                 self.assertEqual(task.state, TaskState.CANCELLED)
+                self.assertIn("API_QUOTA", supervisor.resources.held_by(task.id))
+                release_block.set()
+                while supervisor.resources.held_by(task.id) and time.monotonic() < deadline + 1:
+                    time.sleep(0.01)
                 self.assertEqual(supervisor.resources.held_by(task.id), [])
         finally:
+            release_block.set()
             supervisor.stop()
 
     def test_pause_releases_resources_and_resume_continues_from_saved_step(self):

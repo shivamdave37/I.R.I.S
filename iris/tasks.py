@@ -39,5 +39,6 @@ class Task:
     result: str = ""
     error: str = ""
     timeout_seconds: float = 60.0
+    permission_waiting: bool = False
     pause_event: threading.Event = field(default_factory=threading.Event)
     cancel_event: threading.Event = field(default_factory=threading.Event)

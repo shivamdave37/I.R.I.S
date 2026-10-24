@@ -91,6 +91,7 @@ Install packages into the project virtual environment with `python -m pip instal
 - Stage 3's real Gemini, Ollama, live RSS, and offline behavior remain human checks.
 - Iris reserves all requested resources in one locked operation; the AI planner cannot select a Git or file-writing skill for an unknown request.
 - Task execution is serialized so worker prompts share one input path. Resource ownership and priority selection remain managed by Iris.
+- A timed-out or cancelled worker keeps its resources until it exits; Python cannot kill a blocked worker safely. `stop all` waits up to two seconds and reports when a blocking step is still finishing. This preserves exclusive resource ownership but cannot guarantee immediate release for an unusually long non-pausable step.
 - Sensitive `GIT_REPO`, `SCREEN_FOCUS`, and `NOTES_FILE` approvals require typed approval every time. Non-sensitive session and always grants use `data/permissions.json`.
 - The demo and tests ran in the project's virtual environment. Real voice devices, app paths, Gemini/Ollama/RSS services, clipboard selection, and GitHub login/push still require a human check.
 - To keep interactive Git confirmations, permission answers, and admin commands on one keyboard path, Iris starts one task at a time. The resource manager still supports atomic ownership of independent resources; adding concurrent task workers would need a shared UI loop that preserves this prompt guarantee.
@@ -130,3 +131,4 @@ Install packages into the project virtual environment with `python -m pip instal
 - Kept `USE_IRIS = False` as the default, so Stage 4 remains the default until the human enables Iris in `config.py`.
 - Full suite: 81 tests passed. `python -m iris.demo` showed the forced naive deadlock, successful all-at-once reservations, aging, and pause/resume from step 1.
 - Codex did this self-review because Antigravity is unavailable. No real microphone/speaker, app path, API provider, RSS, clipboard, or GitHub authentication check was claimed.
+- Final self-review found no code changes needed after retaining resource locks until timed-out workers actually exit. The Stage 10.13 request to free all resources within a few seconds can conflict with Stage 10.5's rule to wait for non-pausable file/Git work; see the unresolved handoff note.

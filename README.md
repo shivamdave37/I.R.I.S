@@ -41,7 +41,7 @@ For local AI chat, install [Ollama](https://ollama.com), run `ollama run gemma3:
 - `save my work to GitHub`: Jarvis shows the changed files, asks for typed approval to stage, requests a commit message and typed approval, then asks for a separate typed approval before pushing.
 - `exit` or `quit`
 
-When Iris is enabled, ordinary requests are queued as tasks. Type or say `status` to see each task's state, priority, resource ownership, estimate, elapsed time, and result. Admin controls are `pause <task>`, `resume <task>`, `cancel <task>`, `switch to <task>`, `priority <task> <number>`, `grants`, `revoke <resource>`, and `stop all`. Use the task ID or exact displayed name. `stop all` cancels current work but keeps Jarvis running.
+When Iris is enabled, ordinary requests are queued as tasks. Type or say `status` to see each task's state, priority, resource ownership, estimate, elapsed time, and result. Admin controls are `pause <task>`, `resume <task>`, `cancel <task>`, `switch to <task>`, `priority <task> <number>`, `grants`, `revoke <resource>`, and `stop all`. Use the task ID or exact displayed name. `stop all` cancels current work but keeps Jarvis running. If a blocked or non-pausable step is still finishing, Iris keeps its resource reserved until the worker exits and reports that it is still finishing.
 
 To queue multiple demo requests, type `queue: time; latest news; show my notes`. Each request becomes a separate task. Unknown requests stay on the chat path; an AI plan cannot select a Git or file-writing action.
 
