@@ -80,3 +80,36 @@ def save_to_github():
     if push_result.returncode != 0:
         return f"Git push failed with exit code {push_result.returncode}. Check your remote and GitHub login."
     return "Your changes were committed and pushed to GitHub."
+
+
+def commit_learned_skill(slug, deleted=False):
+    """Commit only one learned skill and its registry without pushing."""
+    import re
+
+    if not re.fullmatch(r"[a-z0-9_]+", slug):
+        return False, "The learned-skill name is invalid."
+    skill_path = f"skills/learned/{slug}.py"
+    registry_path = "data/learned_skills.json"
+    allowed_paths = {skill_path, registry_path}
+    try:
+        staged = _run_git(["diff", "--cached", "--name-only"])
+        if staged.returncode != 0 or staged.stdout.strip():
+            return False, "The Git index has unrelated staged changes; nothing was committed."
+        if deleted:
+            add_result = _run_git(["add", "-A", "--", skill_path, registry_path])
+        else:
+            add_result = _run_git(["add", "-f", "--", skill_path, registry_path])
+        if add_result.returncode != 0:
+            return False, "Git could not stage the approved skill files."
+        staged = _run_git(["diff", "--cached", "--name-only"])
+        staged_paths = {line.strip().replace("\\", "/") for line in staged.stdout.splitlines() if line.strip()}
+        if staged.returncode != 0 or staged_paths != allowed_paths:
+            _run_git(["reset", "--", skill_path, registry_path])
+            return False, "Git staged an unexpected file; no commit was made."
+        commit = _run_git(["commit", "-m", f"Learned skill: {slug}"])
+        if commit.returncode != 0:
+            _run_git(["reset", "--", skill_path, registry_path])
+            return False, "The local learned-skill commit failed."
+    except Exception:
+        return False, "The fixed local Git operation failed safely."
+    return True, "Committed locally; nothing was pushed."

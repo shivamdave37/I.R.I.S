@@ -19,8 +19,8 @@ WAKE_CHUNK_TIMEOUT = 1
 WAKE_PHRASE_LIMIT = 3
 WAKE_COMMAND_TIMEOUT = 5
 WAKE_COMMAND_LIMIT = 8
-IRIS_RESOURCES = ["MIC_SPEAKER", "CLIPBOARD", "SCREEN_FOCUS", "GIT_REPO", "API_QUOTA", "NOTES_FILE", "USER_CONFIG_FILE"]
-ALLOWED_SKILLS = ["open", "timeinfo", "news", "code_helper", "github_tools", "notes", "memory", "chat", "user_config"]
+IRIS_RESOURCES = ["MIC_SPEAKER", "CLIPBOARD", "SCREEN_FOCUS", "GIT_REPO", "API_QUOTA", "NOTES_FILE", "USER_CONFIG_FILE", "LEARNED_SKILLS"]
+ALLOWED_SKILLS = ["open", "timeinfo", "news", "code_helper", "github_tools", "notes", "memory", "chat", "user_config", "learned_skills"]
 RESOURCE_REASONS = {
     ("CLIPBOARD", "code_helper"): "to read the code you selected",
     ("SCREEN_FOCUS", "code_helper"): "to copy from your active window",
@@ -50,6 +50,14 @@ RESOURCE_REASONS = {
     ("MIC_SPEAKER", "memory"): "to hear your command and speak the memory result",
     ("MIC_SPEAKER", "chat"): "to hear your command and speak the AI reply",
     ("USER_CONFIG_FILE", "user_config"): "to save your approved app and website list",
+    ("API_QUOTA", "learned_skills"): "to ask AI for the skill code you requested",
+    ("LEARNED_SKILLS", "learned_skills"): "to install, list, or undo an approved learned skill",
+    ("GIT_REPO", "learned_skills"): "to create a local commit of the approved skill only",
+    ("MIC_SPEAKER", "learned_skills"): "to hear your request and speak the skill reply",
+    ("CLIPBOARD", "learned_skills"): "for the resource declared by this learned skill",
+    ("SCREEN_FOCUS", "learned_skills"): "for the resource declared by this learned skill",
+    ("NOTES_FILE", "learned_skills"): "for the resource declared by this learned skill",
+    ("USER_CONFIG_FILE", "learned_skills"): "for the resource declared by this learned skill",
 }
 
 WEBSITES = {

@@ -1,4 +1,4 @@
-# Stage 6 Review Pack (6A and 6B complete)
+# Stage 6 Review Pack (6A, 6B, and 6C builder implementation complete; review pending)
 
 ## Folder structure
 
@@ -38,6 +38,9 @@
 │   ├── apps.py
 │   ├── code_helper.py
 │   ├── github_tools.py
+│   ├── learned_skills.py   # checker, approvals, bounded runner, registry, and undo
+│   ├── learned/
+│   │   └── __init__.py     # destination for approved learned-skill files
 │   ├── memory.py
 │   ├── news.py
 │   ├── notes.py
@@ -70,6 +73,9 @@
 - `skills/memory.py` stores a name, preferences, and the latest 20 commands in `data/memory.json` with a file lock; it redacts the configured Gemini key from command history.
 - `skills/news.py`, `skills/apps.py`, `skills/web.py`, and `skills/timeinfo.py` implement news, approved app/site opening, and time/date behavior.
 - `skills/user_config.py` searches Start Menu shortcuts, validates approved website URLs and app paths, and stores confirmed learned entries under `data/user_config.json`.
+- `skills/learned_skills.py` checks proposed skill code, shows its source and resources, gates testing and installation with two typed approvals, uses a bounded isolated process, and manages the learned-skill registry.
+- `skills/learned/` is the destination folder for approved Python skills. The fixed Git helper commits only the selected skill and registry locally, with no push.
+- `tests/test_learned_skills.py` covers checker rules, approval order, protected-file checks, timeouts, paths, declared resources, undo, and the no-push helper.
 - `tests/` has offline unit tests for voice, routing, AI/news, Stage 4 helpers, and Iris.
 - `iris/tasks.py` stores task data and the fixed lifecycle states.
 - `iris/resources.py` atomically reserves or releases Iris's logical resources.
@@ -98,7 +104,7 @@ Install packages into the project virtual environment with `python -m pip instal
 - Iris reserves all requested resources in one locked operation; the AI planner cannot select a Git or file-writing skill for an unknown request.
 - Task execution is serialized so worker prompts share one input path. Resource ownership and priority selection remain managed by Iris.
 - A timed-out or cancelled worker keeps its resources until it exits; Python cannot kill a blocked worker safely. `stop all` waits up to two seconds and reports when a blocking step is still finishing. This preserves exclusive resource ownership but cannot guarantee immediate release for an unusually long non-pausable step.
-- Sensitive `GIT_REPO`, `SCREEN_FOCUS`, `NOTES_FILE`, and `USER_CONFIG_FILE` approvals require typed approval every time. Non-sensitive session and always grants use `data/permissions.json`.
+- Sensitive `GIT_REPO`, `SCREEN_FOCUS`, `NOTES_FILE`, `USER_CONFIG_FILE`, and `LEARNED_SKILLS` approvals require typed approval every time. Non-sensitive session and always grants use `data/permissions.json`.
 - The demo and tests ran in the project's virtual environment. Real voice devices, app paths, Gemini/Ollama/RSS services, clipboard selection, and GitHub login/push still require a human check.
 - To keep interactive Git confirmations, permission answers, and admin commands on one keyboard path, Iris starts one task at a time. The resource manager still supports atomic ownership of independent resources; adding concurrent task workers would need a shared UI loop that preserves this prompt guarantee.
 - Unknown or complex user requests use one validated `chat` plan step. Multi-action commands are queued as separate tasks with `queue:` until a later version defines safe step arguments.
@@ -155,3 +161,13 @@ Install packages into the project virtual environment with `python -m pip instal
 - **Verified:** `queue:` prefix parsing does not bypass safety — each sub-command goes through the same planner/permission gate.
 - **Verified:** No API keys in source or committed files.
 - Full suite: **83 tests passed**. Tag: `stage-5-reviewed`.
+
+## Stage 6C builder notes
+
+- Added `LEARNED_SKILLS` as a sensitive Iris resource and fixed resource reasons for learned-skill commands. Planner routes matching installed keywords to a normal Iris task that reserves the skill's declared resources.
+- Added an AST checker for the allowlist, blocked names/attributes, exact metadata, top-level code, flat `run(command)` function, known resources, and 120-line limit. A proposal stays in memory until the first typed yes; then its ignored proposal file is tested in an isolated `python -I` process for at most five seconds using a fixed command.
+- The complete code, resource list, and checker result appear before the first approval. A passing test result appears before the second approval. Install, registry updates, replacement, and undo use only `data/`, `proposed_skills/`, and `skills/learned/`; protected project files are hashed at Iris startup and checked after both approvals.
+- The fixed local Git helper requires an empty index, stages exactly the approved skill and registry, uses a fixed commit message, and never pushes. Undo makes a local commit the same way.
+- The test process is not a true Windows sandbox: it runs as the current Windows user. The static checker, narrow imports, typed resource permissions, two typed approvals, and reading the full candidate are still required.
+- Full suite using the project virtual environment: **126 tests passed**. Tests mock AI and Git and use a safe slow fixture for timeout termination; they do not verify a real AI response or human approval session.
+- Human checks still needed: read a harmless AI-generated skill, approve both gates, inspect the local commit, run its keyword, undo it, and confirm there was no push. Wake word, real apps, microphone/speaker, AI providers, and GitHub login also remain manual.

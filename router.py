@@ -6,6 +6,7 @@ import config
 from ai import ask_ai
 from skills import apps, code_helper, github_tools, memory, news, notes, timeinfo, web
 from skills import user_config
+from skills import learned_skills
 
 
 def normalize(command):
@@ -55,6 +56,10 @@ def handle(command):
         if not getattr(config, "USE_IRIS", False):
             return "Enable Iris in config.py to manage learned apps and websites."
         return user_config.handle(command)
+    if normalized.startswith(("add a skill that ", "change skill ")) or normalized in {"list skills", "undo last skill"} or learned_skills.matches_command(command):
+        if not getattr(config, "USE_IRIS", False):
+            return "Enable Iris in config.py to manage learned skills."
+        return learned_skills.handle(command)
 
     # Direct time queries.
     if normalized in {"time", "what is the time", "whats the time", "tell me the time"}:

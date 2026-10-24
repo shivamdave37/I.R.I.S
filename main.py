@@ -86,7 +86,9 @@ def run_iris(mode):
     from iris.console import input_broker
     from iris.permissions import PermissionManager
     from iris import wake
+    from skills.learned_skills import initialize_protected_hashes
 
+    initialize_protected_hashes()
     permission_manager = PermissionManager()
     def show_result(task):
         """Forward completed task text to the console and queued speaker."""

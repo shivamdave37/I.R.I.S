@@ -10,7 +10,7 @@ import config
 from iris.console import input_broker
 
 
-SENSITIVE_RESOURCES = {"GIT_REPO", "SCREEN_FOCUS", "NOTES_FILE", "USER_CONFIG_FILE"}
+SENSITIVE_RESOURCES = {"GIT_REPO", "SCREEN_FOCUS", "NOTES_FILE", "USER_CONFIG_FILE", "LEARNED_SKILLS"}
 
 
 class PermissionManager:

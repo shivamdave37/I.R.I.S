@@ -15,6 +15,17 @@ def resources_for(command):
         return ["NOTES_FILE"]
     if text.startswith(("add app ", "add website ", "remove app ", "remove website ")):
         return ["USER_CONFIG_FILE"]
+    if text.startswith("add a skill that ") or text.startswith("change skill ") or text in {"list skills", "undo last skill"}:
+        resources = ["LEARNED_SKILLS"]
+        if text.startswith("add a skill that ") or text.startswith("change skill "):
+            resources.extend(["API_QUOTA", "GIT_REPO"])
+        elif text == "undo last skill":
+            resources.append("GIT_REPO")
+        return resources
+    from skills.learned_skills import resources_for_command
+    learned_resources = resources_for_command(command)
+    if learned_resources is not None:
+        return learned_resources
     if text in {"list apps", "list websites"}:
         return []
     if text == "show my notes":
