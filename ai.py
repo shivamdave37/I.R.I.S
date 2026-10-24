@@ -37,6 +37,7 @@ def ask_ai(messages):
     if configured_key and configured_key in user_text:
         return "I can't send a message containing the configured Gemini API key."
 
+    # Append to working history; will be rolled back if the provider call fails.
     CHAT_HISTORY.append({"role": "user", "content": user_text})
     CHAT_HISTORY = CHAT_HISTORY[-10:]
     providers = [str(config.AI_PROVIDER).strip().lower()]
@@ -50,8 +51,10 @@ def ask_ai(messages):
             if provider == "gemini":
                 # Load only the API key variable; never read or send the .env file itself.
                 api_key = os.getenv("GEMINI_API_KEY")
-                if not api_key:
-                    return "Gemini is selected, but GEMINI_API_KEY is missing from .env."
+                if not api_key or api_key.strip() in {"your_key_here", "your_gemini_api_key_here"}:
+                    if CHAT_HISTORY and CHAT_HISTORY[-1]["role"] == "user":
+                        CHAT_HISTORY.pop()
+                    return "Gemini is selected, but GEMINI_API_KEY is missing or still set to the example placeholder in .env."
 
                 conversation = [SYSTEM_PROMPT, "Conversation so far:"]
                 for message in CHAT_HISTORY:
@@ -73,6 +76,8 @@ def ask_ai(messages):
                 response.raise_for_status()
                 reply = response.json().get("message", {}).get("content", "").strip()
             else:
+                if CHAT_HISTORY and CHAT_HISTORY[-1]["role"] == "user":
+                    CHAT_HISTORY.pop()
                 return f"Unknown AI provider '{provider}'. Choose gemini or ollama in config.py."
 
             if not reply:
@@ -90,6 +95,11 @@ def ask_ai(messages):
             if is_quota_error and provider != providers[-1]:
                 first_rate_error = f"{provider.title()} reached a rate or quota limit."
                 continue
+
+            # Remove unfulfilled user message on terminal failure so history is not corrupted.
+            if CHAT_HISTORY and CHAT_HISTORY[-1]["role"] == "user":
+                CHAT_HISTORY.pop()
+
             if is_quota_error:
                 return f"{provider.title()} reached its free-tier rate or quota limit. Please wait and try again."
             if first_rate_error:
@@ -99,4 +109,6 @@ def ask_ai(messages):
                 return "I couldn't reach Ollama. Check that Ollama is running and the configured model is installed."
             return "I couldn't get an AI response. Check your internet connection and Gemini API key."
 
+    if CHAT_HISTORY and CHAT_HISTORY[-1]["role"] == "user":
+        CHAT_HISTORY.pop()
     return "I couldn't get an AI response right now."

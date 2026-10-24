@@ -31,7 +31,8 @@ def log_action(command, result):
         # Redact the configured key before writing user input or errors to disk.
         load_dotenv()
         api_key = os.getenv("GEMINI_API_KEY")
-        if api_key:
+        if api_key and api_key.strip():
+            api_key = api_key.strip()
             command = str(command).replace(api_key, "[REDACTED]")
             result = str(result).replace(api_key, "[REDACTED]")
         # Log command and outcome for audit and debugging purposes.

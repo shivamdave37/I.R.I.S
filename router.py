@@ -55,7 +55,8 @@ def handle(command):
     # Direct date queries.
     if normalized in {"date", "what is the date", "whats the date", "tell me the date"}:
         return timeinfo.tell_date()
-    if normalized in {"news", "latest news"}:
+    # Direct news queries.
+    if normalized in {"news", "latest news", "whats the news", "what is the news", "tell me the news"}:
         return news.get_news()
 
     # Any other command, including punctuation-only input, goes to the fallback.

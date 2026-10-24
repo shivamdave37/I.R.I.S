@@ -37,6 +37,15 @@ class NewsTests(unittest.TestCase):
         get_news.assert_called_once_with()
         ask_ai.assert_not_called()
 
+    def test_news_unescapes_html_entities(self):
+        """Clean HTML entities from RSS titles for spoken and printed clarity."""
+        response = Mock(content=b"<rss/>")
+        entries = [{"title": "Tom &amp; Jerry&#39;s New Adventure"}]
+        with patch("skills.news.requests.get", return_value=response):
+            with patch("skills.news.feedparser.parse", return_value=SimpleNamespace(entries=entries)):
+                reply = news.get_news()
+        self.assertIn("Tom & Jerry's New Adventure", reply)
+
 
 if __name__ == "__main__":
     unittest.main()

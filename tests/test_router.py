@@ -147,6 +147,16 @@ class RouterTests(unittest.TestCase):
             main.log_action("time", "The time is 12:00 PM.")
             mock_info.assert_called_once_with("command=%r | result=%r", "time", "The time is 12:00 PM.")
 
+    def test_news_variations_route_to_news(self):
+        """Route conversational news requests directly to the news skill."""
+        for phrase in ("news", "latest news", "whats the news", "tell me the news"):
+            with self.subTest(phrase=phrase):
+                with patch("router.news.get_news", return_value="HEADLINES") as get_news:
+                    with patch("router.ask_ai") as ask_ai:
+                        self.assertEqual(router.handle(phrase), "HEADLINES")
+                    get_news.assert_called_once_with()
+                    ask_ai.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

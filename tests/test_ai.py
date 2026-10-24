@@ -98,6 +98,28 @@ class AiTests(unittest.TestCase):
         make_client.assert_not_called()
         self.assertEqual(ai.CHAT_HISTORY, [])
 
+    def test_failed_call_does_not_corrupt_chat_history(self):
+        """Roll back the unfulfilled user message if the AI provider fails."""
+        client = Mock()
+        client.models.generate_content.side_effect = RuntimeError("network disconnected")
+        with patch("ai.config.AI_PROVIDER", "gemini"):
+            with patch("ai.config.AI_FALLBACK_PROVIDER", None):
+                with patch("ai.load_dotenv"), patch("ai.os.getenv", return_value="fake-key"):
+                    with patch("ai.genai.Client", return_value=client):
+                        reply = ai.ask_ai("Failed question")
+        self.assertIn("couldn't get an AI response", reply)
+        self.assertEqual(ai.CHAT_HISTORY, [])
+
+    def test_placeholder_key_in_env_returns_clear_message(self):
+        """Detect when GEMINI_API_KEY is still the example template value."""
+        with patch("ai.config.AI_PROVIDER", "gemini"):
+            with patch("ai.load_dotenv"), patch("ai.os.getenv", return_value="your_key_here"):
+                with patch("ai.genai.Client") as make_client:
+                    reply = ai.ask_ai("hello")
+        self.assertIn("GEMINI_API_KEY is missing", reply)
+        make_client.assert_not_called()
+        self.assertEqual(ai.CHAT_HISTORY, [])
+
 
 if __name__ == "__main__":
     unittest.main()

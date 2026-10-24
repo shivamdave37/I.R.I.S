@@ -71,3 +71,12 @@ For Ollama, install it from [ollama.com](https://ollama.com), run `ollama run ge
 - Added Gemini and Ollama behind `ask_ai()`, a ten-message conversation window, quota-only optional fallback, configured-key log redaction, and an RSS skill with a five-headline cap.
 - Chosen Gemini model: `gemini-3.5-flash-lite`; local Ollama model: `gemma3:1b`.
 - Stage 3 tests mock both AI providers and the RSS request; real provider/feed checks are listed in `HANDOFF.md`.
+
+### Stage 3 reviewer findings
+- **Chat history integrity on failed turns**: Fixed `ai.ask_ai()` to roll back unfulfilled user messages from `CHAT_HISTORY` when an API query fails (missing key, quota limit, network error), ensuring the history only records complete, successful user-assistant turns.
+- **Example API key placeholder check**: Added detection for example placeholder keys (`your_key_here`) in `.env` so Jarvis provides a clear setup reminder instead of triggering an invalid API call.
+- **HTML entity decoding in news titles**: Added `html.unescape()` in `skills/news.py` so entities like `&amp;` and `&#39;` in RSS headlines are decoded cleanly for spoken and printed output.
+- **Conversational news routing**: Added `"whats the news"`, `"what is the news"`, and `"tell me the news"` to `router.py` direct routing so natural queries do not fall through to the AI.
+- **Key redaction in logs**: Added whitespace stripping guard before key redaction in `main.py` to prevent replacing whitespace if the key environment variable is blank.
+- **Unit test suite expansion**: Added 4 unit tests covering chat history rollback on provider error, placeholder key detection, RSS HTML entity unescaping, and news query variations (42 tests total across test suite, all passing).
+
