@@ -123,12 +123,13 @@ Install packages into the project virtual environment with `python -m pip instal
 - Verified `.env` is not tracked and found no API-key-shaped string in source/history search.
 - Full suite: 60 tests passed. Real clipboard, microphone/speaker, and GitHub login/push checks remain for the human.
 
-### Stage 5 builder and Codex self-review findings
+### Stage 5 reviewer findings (Antigravity)
 
-- Added task records, a priority queue with aging, atomic resource reservation, task workers, timeouts, status output, pause/resume/cancel, and emergency stop.
-- Added fixed resource reasons, typed per-resource approval, 60-second denial, session and saved non-sensitive grants, revoke, audit log entries, and one keyboard broker for worker prompts.
-- Unknown requests stay on the chat path. AI plan output is checked as JSON and cannot select Git, file writing, or runtime rule changes.
-- Kept `USE_IRIS = False` as the default, so Stage 4 remains the default until the human enables Iris in `config.py`.
-- Full suite: 81 tests passed. `python -m iris.demo` showed the forced naive deadlock, successful all-at-once reservations, aging, and pause/resume from step 1.
-- Codex did this self-review because Antigravity is unavailable. No real microphone/speaker, app path, API provider, RSS, clipboard, or GitHub authentication check was claimed.
-- Final self-review found no code changes needed after retaining resource locks until timed-out workers actually exit. The Stage 10.13 request to free all resources within a few seconds can conflict with Stage 10.5's rule to wait for non-pausable file/Git work; see the unresolved handoff note.
+- **Bug fixed:** `_audit(task=None, event)` was silently dropping log entries for admin-only commands (`status`, `grants`, `revoke`). SPEC §10.13 requires every admin command to be written to `jarvis.log`. Fixed by adding a `None` guard so these events log with `task_id='admin'`. Added `test_admin_audit_logged_without_task` to cover this.
+- **Verified:** All SPEC §10.12 "Done means" items are covered by automated tests. All SPEC §5 hard limits checked against source — no violations found.
+- **Verified:** AI plan validation correctly allows only `chat` for unknown requests; action skills (`github_tools`, etc.) are rejected after two retries.
+- **Verified:** Sensitive resources (`GIT_REPO`, `SCREEN_FOCUS`, `NOTES_FILE`) require typed `yes` every time; `always`/`session` are rejected for these.
+- **Verified:** `stop_all` waits up to 2 seconds for running workers and reports when a blocking step is still finishing — this is the known unresolved tension between §10.5 and §10.13.
+- **Verified:** `queue:` prefix parsing does not bypass safety — each sub-command goes through the same planner/permission gate.
+- **Verified:** No API keys in source or committed files.
+- Full suite: **83 tests passed**. Tag: `stage-5-reviewed`.
