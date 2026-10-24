@@ -21,6 +21,12 @@ def _load_speech_recognition():
 def listen():
     """Listen briefly and return recognized text or None on any mic failure."""
     # Never listen while speech is playing so Jarvis cannot hear its own output.
+    audio = capture_audio_chunk(timeout=5, phrase_time_limit=8)
+    return recognize_audio(audio) if audio not in (None, False) else None
+
+
+def capture_audio_chunk(timeout=5, phrase_time_limit=8):
+    """Capture one bounded audio phrase without sending it to an online service."""
     wait_until_done()
     try:
         speech_recognition = _load_speech_recognition()
@@ -28,11 +34,22 @@ def listen():
         # Share one lock with the speaker so queued replies cannot overlap microphone input.
         with _audio_lock:
             with speech_recognition.Microphone() as microphone:
-                # Time limits let the app recover from silence and return to its loop.
-                audio = recognizer.listen(microphone, timeout=5, phrase_time_limit=8)
-            return recognizer.recognize_google(audio)
+                try:
+                    return recognizer.listen(microphone, timeout=timeout, phrase_time_limit=phrase_time_limit)
+                except speech_recognition.WaitTimeoutError:
+                    return None
     except Exception:
-        # Missing devices, silence, and network errors should not stop Jarvis.
+        # The caller can use typed input when capture fails.
+        return False
+
+
+def recognize_audio(audio):
+    """Transcribe one captured phrase with the existing online speech service."""
+    try:
+        speech_recognition = _load_speech_recognition()
+        return speech_recognition.Recognizer().recognize_google(audio)
+    except Exception:
+        # Network or recognition failures should not stop the assistant.
         return None
 
 

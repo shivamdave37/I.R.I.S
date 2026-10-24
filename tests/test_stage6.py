@@ -1,16 +1,20 @@
 """Offline tests for approval-gated Stage 6 app and website settings."""
 
+import io
 import json
 import os
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import config
+import main
 import router
 from iris.agent_planner import plan
 from iris.permissions import PermissionManager, SENSITIVE_RESOURCES
+from iris.resources import ResourceManager
 from iris.tasks import Task
+from iris import wake
 from skills import user_config
 
 
@@ -152,6 +156,101 @@ class UserConfigTests(unittest.TestCase):
                 patch("iris.permissions.input_broker.enqueue"), \
                 patch("iris.permissions.input_broker.wait_for_answer", return_value="session"):
             self.assertFalse(manager.request(task))
+
+
+class WakeWordTests(unittest.TestCase):
+    """Check offline wake detection, fallbacks, and audio resource ownership."""
+
+    def test_wake_is_disabled_by_default(self):
+        """Keep wake listening off until the user changes the setting."""
+        self.assertFalse(config.WAKE_ENABLED)
+        self.assertFalse(wake.create_listener()["enabled"])
+
+    def test_one_audio_chunk_can_contain_wake_word_and_command(self):
+        """Decode a command from the same phrase as its wake word."""
+        audio = object()
+        listener = {"enabled": True, "offline": True, "model": object()}
+        with patch("iris.wake._capture", return_value=("audio", audio)) as capture:
+            with patch("iris.wake._recognized_text", side_effect=["iris [unk]", "hey iris open youtube"]) as recognize:
+                status, command = wake.listen_chunk(ResourceManager(), listener)
+        self.assertEqual((status, command), ("wake", "open youtube"))
+        self.assertEqual(recognize.call_count, 2)
+        self.assertEqual(json.loads(recognize.call_args_list[0].args[2]), ["iris", "[unk]"])
+        capture.assert_called_once()
+
+    def test_vosk_runtime_error_is_labeled_and_uses_online_fallback(self):
+        """Keep the loop running if the offline decoder fails after startup."""
+        audio = object()
+        listener = {"enabled": True, "offline": True, "model": object()}
+        with patch("iris.wake._capture", return_value=("audio", audio)):
+            with patch("iris.wake._recognized_text", side_effect=["iris", RuntimeError("decoder")]):
+                with patch("iris.wake.voice.recognize_audio", return_value="hey iris open youtube"):
+                    with patch("sys.stdout", new_callable=io.StringIO) as output:
+                        self.assertEqual(wake.listen_chunk(ResourceManager(), listener), ("wake", "open youtube"))
+        self.assertFalse(listener["offline"])
+        self.assertIn("online fallback", output.getvalue())
+
+    def test_vosk_missing_model_selects_clear_online_fallback(self):
+        """Use the labeled online mode when the configured model folder is absent."""
+        with patch.object(config, "WAKE_ENABLED", True), patch.object(config, "WAKE_MODEL_PATH", "missing-model-folder"):
+            with patch("sys.stdout", new_callable=io.StringIO) as output:
+                listener = wake.create_listener()
+        self.assertTrue(listener["enabled"])
+        self.assertFalse(listener["offline"])
+        self.assertIn("online fallback", output.getvalue())
+
+    def test_online_fallback_detects_wake_and_same_phrase_command(self):
+        """Use the existing online recognizer when Vosk is unavailable."""
+        audio = object()
+        listener = {"enabled": True, "offline": False, "model": None}
+        with patch("iris.wake._capture", return_value=("audio", audio)):
+            with patch("iris.wake.voice.recognize_audio", return_value="hey iris what's the time"):
+                self.assertEqual(wake.listen_chunk(ResourceManager(), listener), ("wake", "what's the time"))
+
+    def test_no_wake_word_does_not_start_a_command(self):
+        """Keep ordinary speech in idle state until the configured word is heard."""
+        audio = object()
+        listener = {"enabled": True, "offline": False, "model": None}
+        with patch("iris.wake._capture", return_value=("audio", audio)):
+            with patch("iris.wake.voice.recognize_audio", return_value="what is the time"):
+                self.assertEqual(wake.listen_chunk(ResourceManager(), listener), ("idle", ""))
+
+    def test_wake_listener_does_not_open_mic_while_task_holds_resource(self):
+        """Skip microphone capture when an Iris task owns MIC_SPEAKER."""
+        resources = ResourceManager()
+        task = Task(2, "voice task", "chat", needed_resources=["MIC_SPEAKER"])
+        self.assertTrue(resources.reserve_all(task))
+        listener = {"enabled": True, "offline": False, "model": None}
+        with patch("iris.wake.voice.capture_audio_chunk") as capture:
+            self.assertEqual(wake.listen_chunk(resources, listener), ("busy", ""))
+        capture.assert_not_called()
+
+    def test_wake_capture_waits_for_speech_and_releases_audio_lock(self):
+        """Wait for queued speech before capture and release the resource afterward."""
+        resources = ResourceManager()
+        with patch("iris.wake.voice.wait_until_done") as wait_for_speech:
+            with patch("iris.wake.voice.capture_audio_chunk", return_value=None) as capture:
+                self.assertEqual(wake._capture(resources, 1, 3), ("idle", None))
+        wait_for_speech.assert_called_once_with()
+        capture.assert_called_once_with(timeout=1, phrase_time_limit=3)
+        self.assertEqual(resources.snapshot(), {})
+
+    def test_mic_error_requests_typed_command_in_iris_loop(self):
+        """Fall back to keyboard input when wake listening cannot access the mic."""
+        supervisor = Mock()
+        supervisor.resources = ResourceManager()
+        supervisor.pending_permission_prompt.return_value = None
+        with patch("iris.iris.Iris", return_value=supervisor):
+            with patch("iris.permissions.PermissionManager") as permission_type:
+                permission_type.return_value.pending_prompt.return_value = None
+                with patch("iris.wake.create_listener", return_value={"enabled": True, "offline": False, "model": None}):
+                    with patch("iris.wake.listen_chunk", return_value=("error", "")):
+                        with patch("main._keyboard_input_ready", return_value=False):
+                            with patch("main.read_console_line", return_value="exit") as typed_input:
+                                with patch("main.voice.wait_until_done"), patch("main.voice.shutdown"):
+                                    with patch("sys.stdout", new_callable=io.StringIO):
+                                        main.run_iris("both")
+        typed_input.assert_called_once()
 
 
 if __name__ == "__main__":

@@ -59,6 +59,16 @@ def read_console_line(prompt, yield_if=None):
             time.sleep(0.02)
 
 
+def _keyboard_input_ready():
+    """Check whether the Windows console has typed input waiting."""
+    try:
+        import msvcrt
+        return msvcrt.kbhit()
+    except ImportError:
+        # Non-Windows runs keep typed input available without a polling API.
+        return True
+
+
 def _iris_result(task, speak_replies):
     """Show completed task replies and speak them only in voice modes."""
     message = task.result if task.state.value == "DONE" else f"Task {task.id} failed: {task.error}"
@@ -75,6 +85,7 @@ def run_iris(mode):
     from iris.iris import Iris
     from iris.console import input_broker
     from iris.permissions import PermissionManager
+    from iris import wake
 
     permission_manager = PermissionManager()
     def show_result(task):
@@ -84,6 +95,7 @@ def run_iris(mode):
     supervisor = Iris(permission_callback=permission_manager.request, result_callback=show_result)
     supervisor.permission_manager = permission_manager
     input_broker.enabled = True
+    wake_listener = wake.create_listener() if getattr(config, "WAKE_ENABLED", False) and mode != "typed" else None
     print("Iris supervision is enabled. Type or say 'status' to inspect tasks.")
     deferred_command = None
     deferred_is_typed = False
@@ -127,19 +139,46 @@ def run_iris(mode):
                 elif mode == "typed":
                     command = read_console_line("You: ", prompt_is_pending)
                     typed_command = True
+                elif wake_listener is not None:
+                    if _keyboard_input_ready():
+                        command = read_console_line("You: ", prompt_is_pending)
+                        typed_command = True
+                    else:
+                        wake_status, command = wake.listen_chunk(supervisor.resources, wake_listener)
+                        if wake_status in {"idle", "busy"}:
+                            continue
+                        if wake_status == "wake":
+                            voice.speak("Yes?")
+                            voice.wait_until_done()
+                            if not command:
+                                wake_status, command = wake.listen_for_command(supervisor.resources, wake_listener)
+                            if wake_status != "command" and not command:
+                                print("I couldn't hear a command. Please type it.")
+                                command = read_console_line("You: ", prompt_is_pending)
+                                typed_command = True
+                            else:
+                                typed_command = False
+                        else:
+                            print("Wake listening failed. Please type your command.")
+                            command = read_console_line("You: ", prompt_is_pending)
+                            typed_command = True
                 else:
-                    voice.wait_until_done()
                     print("Listening...")
-                    command = voice.listen()
+                    listen_status, command = wake.listen_regular_command(supervisor.resources)
                     typed_command = False
-                    if command is None and mode == "both":
+                    if listen_status == "busy":
+                        print("The microphone is in use. Please type your command.")
+                        command = read_console_line("You: ", prompt_is_pending)
+                        typed_command = True
+                    elif listen_status == "error" and mode == "both":
                         print("I couldn't hear you. Please type your command.")
                         command = read_console_line("You: ", prompt_is_pending)
                         typed_command = True
-                    elif command is None:
+                    elif listen_status == "error":
                         message = "I couldn't hear you. Please try again."
                         print(f"Jarvis: {message}")
                         voice.speak(message)
+                        command = None
             except (EOFError, KeyboardInterrupt):
                 print("\nJarvis: Goodbye!")
                 break

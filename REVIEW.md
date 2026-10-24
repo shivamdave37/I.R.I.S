@@ -1,4 +1,4 @@
-# Stage 6 Review Pack (6A complete)
+# Stage 6 Review Pack (6A and 6B complete)
 
 ## Folder structure
 
@@ -31,7 +31,8 @@
 │   ├── iris.py
 │   ├── permissions.py
 │   ├── resources.py
-│   └── tasks.py
+│   ├── tasks.py
+│   └── wake.py              # bounded wake-word audio capture and recognition
 ├── skills/
 │   ├── __init__.py
 │   ├── apps.py
@@ -79,6 +80,8 @@
 - `iris/permissions.py` prompts for resource approvals and persists non-sensitive grants under ignored `data/permissions.json`.
 - `iris/console.py` routes worker prompts through the main keyboard loop.
 - `iris/demo.py` demonstrates deadlock prevention, priority aging, and pause/resume.
+- `iris/wake.py` checks short microphone chunks with a restricted Vosk grammar or the documented online fallback, while briefly reserving `MIC_SPEAKER` for each capture.
+- `requirements.txt` lists Vosk so offline wake recognition can be installed in the project virtual environment.
 - `.env.example` contains only the key placeholder; `.env`, local state, and dependencies are ignored.
 
 ## Run and test
@@ -106,7 +109,15 @@ Install packages into the project virtual environment with `python -m pip instal
 - Learned app and website entries live only in ignored `data/user_config.json`. Built-in names take precedence over saved values. The settings path is constrained to the project's `data/` folder, and writes use a lock and atomic replacement.
 - App commands search current-user and all-users Start Menu `.lnk` files. If no shortcut is found, Jarvis accepts only an existing `.exe` or `.lnk` path. Website entries require HTTPS and a valid hostname.
 - `tests/test_stage6.py` covers validation, typed approvals, file handling, built-in protection, routing, and the sensitive permission. Full suite: 96 tests passed.
-- Actual Start Menu discovery and real app paths need a Windows human check. Wake-word and learned-skill features are not implemented yet.
+- Actual Start Menu discovery and real app paths need a Windows human check. Wake mode is implemented but still needs human testing. Learned skills remain unimplemented.
+
+## Stage 6B builder notes
+
+- Added optional offline wake detection with Vosk and a restricted grammar containing only the wake word and `[unk]`. The full recognizer re-decodes the same captured phrase to preserve a command spoken immediately after “Iris.”
+- Each microphone chunk reserves and releases `MIC_SPEAKER`; wake capture waits for queued speech first. When a task owns that resource, wake capture is skipped. Microphone failures fall back to typed input, and typed input is polled while wake mode is idle.
+- Vosk detection is disabled by default. If the Vosk package or model is missing or fails to load, the app clearly labels and uses the online fallback. This fallback recognizes short chunks with the existing online service.
+- Official [Vosk installation notes](https://alphacephei.com/vosk/install) list Windows x86 and x64 as supported. The [Vosk model list](https://alphacephei.com/vosk/models) lists `vosk-model-small-en-in-0.4` at 36 MB under Apache 2.0. Vosk 0.3.45 installed in the project virtual environment. The model itself was not downloaded, and the user's real device, accent accuracy, and noisy-room behavior still need human testing.
+- Full suite after 6B changes: 105 tests passed. Wake tests mock audio and recognition; they do not claim microphone or speaker hardware works.
 
 ## Reviewer findings
 

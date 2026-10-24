@@ -7,3 +7,4 @@ requests
 feedparser
 pyautogui
 pyperclip
+vosk
