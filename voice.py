@@ -7,6 +7,7 @@ import threading
 _speaker_queue = queue.Queue()
 _speaker_thread = None
 _speaker_lock = threading.Lock()
+_audio_lock = threading.Lock()
 
 
 def _load_speech_recognition():
@@ -24,10 +25,12 @@ def listen():
     try:
         speech_recognition = _load_speech_recognition()
         recognizer = speech_recognition.Recognizer()
-        with speech_recognition.Microphone() as microphone:
-            # Time limits let the app recover from silence and return to its loop.
-            audio = recognizer.listen(microphone, timeout=5, phrase_time_limit=8)
-        return recognizer.recognize_google(audio)
+        # Share one lock with the speaker so queued replies cannot overlap microphone input.
+        with _audio_lock:
+            with speech_recognition.Microphone() as microphone:
+                # Time limits let the app recover from silence and return to its loop.
+                audio = recognizer.listen(microphone, timeout=5, phrase_time_limit=8)
+            return recognizer.recognize_google(audio)
     except Exception:
         # Missing devices, silence, and network errors should not stop Jarvis.
         return None
@@ -52,8 +55,10 @@ def _speaker_worker():
                 break
             if engine is not None:
                 try:
-                    engine.say(text)
-                    engine.runAndWait()
+                    # Keep speech and microphone capture mutually exclusive.
+                    with _audio_lock:
+                        engine.say(text)
+                        engine.runAndWait()
                 except Exception:
                     # Keep the worker alive so a speech error does not break Jarvis.
                     if hasattr(engine, "_inLoop") and getattr(engine, "_inLoop", False):

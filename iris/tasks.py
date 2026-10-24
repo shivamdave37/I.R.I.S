@@ -32,6 +32,7 @@ class Task:
     estimated_time: float = 1.0
     actual_time: float = 0.0
     created_at: float = field(default_factory=time.monotonic)
+    authorized_at: float = 0.0
     started_at: float = 0.0
     finished_at: float = 0.0
     current_step: int = 0

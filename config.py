@@ -25,6 +25,23 @@ RESOURCE_REASONS = {
     ("MIC_SPEAKER", "news"): "to speak the news when enabled",
     ("GIT_REPO", "github_tools"): "to inspect or change this Git repository",
     ("NOTES_FILE", "notes"): "to read or write your notes",
+    ("NOTES_FILE", "memory"): "to save or read your saved name and preferences",
+    ("API_QUOTA", "open"): "to allow the open skill to use the configured AI service if needed",
+    ("API_QUOTA", "timeinfo"): "to allow the time skill to use the configured AI service if needed",
+    ("API_QUOTA", "news"): "to fetch current headlines",
+    ("API_QUOTA", "code_helper"): "to send selected code to the AI",
+    ("API_QUOTA", "github_tools"): "to allow the Git helper to use the configured AI service if needed",
+    ("API_QUOTA", "notes"): "to allow the notes skill to use the configured AI service if needed",
+    ("API_QUOTA", "memory"): "to allow the memory skill to use the configured AI service if needed",
+    ("API_QUOTA", "chat"): "to ask the configured AI provider",
+    ("MIC_SPEAKER", "open"): "to hear your command and speak the reply",
+    ("MIC_SPEAKER", "timeinfo"): "to hear your command and speak the reply",
+    ("MIC_SPEAKER", "news"): "to hear your command and speak the headlines",
+    ("MIC_SPEAKER", "code_helper"): "to hear your command and speak the code summary",
+    ("MIC_SPEAKER", "github_tools"): "to hear your command and speak the result",
+    ("MIC_SPEAKER", "notes"): "to hear your command and speak the notes result",
+    ("MIC_SPEAKER", "memory"): "to hear your command and speak the memory result",
+    ("MIC_SPEAKER", "chat"): "to hear your command and speak the AI reply",
 }
 
 WEBSITES = {

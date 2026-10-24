@@ -43,5 +43,5 @@ def plan(command):
 
 def _resources(command):
     """Get resource requirements from the plain-Python permission rules."""
-    from iris.agent_permissions import resources_for
-    return resources_for(command)
+    from iris.agent_permissions import inspect
+    return inspect(command)[0]

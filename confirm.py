@@ -8,7 +8,11 @@ def ask_yes_no(question, require_typed=False):
     print(f"{question} (yes/no)")
     try:
         # Sensitive actions must use the keyboard so nearby speech cannot approve them.
-        answer = input("You: ") if require_typed else voice.listen()
+        if require_typed:
+            from iris.console import request_input
+            answer = request_input("You: ")
+        else:
+            answer = voice.listen()
         if answer is None and not require_typed:
             # Typed fallback keeps confirmation usable when voice recognition times out.
             answer = input("You: ")

@@ -50,7 +50,8 @@ def save_to_github():
         return f"Git add failed with exit code {add_result.returncode}."
 
     try:
-        message = input("Commit message: ").strip()
+        from iris.console import request_input
+        message = (request_input("Commit message: ") or "").strip()
     except (EOFError, KeyboardInterrupt):
         # Keep an interrupted prompt from escaping and crashing the assistant loop.
         return "No commit message was entered. Changes are staged but not committed."
