@@ -1,8 +1,8 @@
-TURN: human
-STAGE: 3
+TURN: reviewer
+STAGE: 4
 ROUND: 0
-BUILDER NOTES: Added Gemini and Ollama chat behind ask_ai(), ten-message chat history, quota error messaging with optional configured fallback, key redaction in logs, and direct news routing for the top five headlines. Selected Gemini model gemini-3.5-flash-lite and Ollama model gemma3:1b. Mocked provider and RSS tests added.
-UNSURE ABOUT: Real Gemini credentials/quota and live BBC RSS availability require a human check. Gemini free-tier data use is described in README.md; avoid sending sensitive chat text.
-REVIEWER FIXED: Rolled back unfulfilled user messages from CHAT_HISTORY when an AI call fails so conversation history is not corrupted; added check for placeholder template API keys in .env; decoded HTML entities in news titles with html.unescape; routed conversational news queries ("whats the news", "tell me the news") directly to news skill; safeguarded key redaction in log_action against blank keys; expanded test coverage from 38 to 42 unit tests.
-REVIEWER UNRESOLVED (needs builder or human): None
-NEEDS HUMAN TEST (mic, speakers, app paths, clipboard, GitHub login): Paste real GEMINI_API_KEY into .env and ask a question (e.g. "who invented the telephone"); test rate-limit/fallback behavior if Ollama is running locally; test live "latest news" and "tell me the news" with internet connection; verify unplugged internet produces clean error message. Do not share or commit .env.
+BUILDER NOTES: Implemented confirm.ask_yes_no(), clipboard explain/fix helpers, GitHub saving with fixed list arguments and separate typed approvals before staging, committing, and pushing, notes, user name/preferences, and 20-command history. Stage 3 review was already completed locally before this stage. `venv\\Scripts\\python.exe -m unittest discover tests` passes (58 tests). Git tests are mocked; no real commit or push was made by the helper tests.
+UNSURE ABOUT: Real clipboard selection and pyautogui behavior need a human Windows check. Actual GitHub login/push was not tested. Stage 3 real Gemini/Ollama/RSS checks and Stage 2 mic/speaker/app-path checks remain pending.
+REVIEWER FIXED: None yet.
+REVIEWER UNRESOLVED (needs builder or human): None yet.
+NEEDS HUMAN TEST (mic, speakers, app paths, clipboard, GitHub login): Select harmless code and try explain/fix; verify explain prints the full result and speaks a short summary, and fix only displays the suggestion. Save/show notes, save a name and preference, and ask what Jarvis remembers. Try save-to-GitHub by declining each typed approval; only try an actual commit/push when you intend to publish the listed changes. Stage 3 Gemini, Ollama, RSS, and offline checks plus Stage 2 microphone, speaker, and app paths remain to be checked.

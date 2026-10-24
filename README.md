@@ -1,76 +1,75 @@
-# Mini Jarvis — Stage 3
+# Mini Jarvis — Stage 4
 
-Stage 3 adds AI chat and five-headline news to the voice-capable Windows assistant. It can still open approved websites and apps, tell the local time and date, and exit on request. Notes, GitHub actions, and Iris are later stages.
-
-## Requirements
-
-- Windows 10 or 11
-- Python 3.10 or newer
-- Internet for Gemini, RSS news, and online speech recognition; Ollama chat runs locally
+Stage 4 adds clipboard code help, personal notes and memory, and a confirmation-gated GitHub save workflow. Earlier commands for approved apps, websites, time, date, news, voice, and AI chat remain available.
 
 ## Setup and run
 
-1. Open this folder in a terminal.
-2. Create and activate a virtual environment:
-
-   ```powershell
-   python -m venv venv
-   .\venv\Scripts\Activate.ps1
-   ```
-
-3. Install packages:
-
-   ```powershell
-   python -m pip install -r requirements.txt
-   ```
-
-4. Copy `.env.example` to `.env`. Create a free Gemini API key in [Google AI Studio](https://aistudio.google.com/apikey), then put it in `.env` as `GEMINI_API_KEY=your_real_key`. Never paste the key into chat or commit `.env`.
-5. Run Jarvis:
-
-   ```powershell
-   python main.py
-   ```
-
-`config.py` defaults to `AI_PROVIDER = "gemini"` and model `gemini-3.5-flash-lite`. The free Gemini tier has usage limits and Google may use free-tier prompts and responses to improve its products; do not send sensitive information. `AI_FALLBACK_PROVIDER` is `None` by default. Set it to `"ollama"` if you want a local fallback after Gemini reports a rate or quota limit.
-
-### Local Ollama option
-
-Install Ollama from [ollama.com](https://ollama.com), then open PowerShell and run:
+Use Python 3.10 or newer on Windows 10/11. From this project folder:
 
 ```powershell
-ollama run gemma3:1b
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+Copy-Item .env.example .env
 ```
 
-This downloads and starts the small `gemma3:1b` model. In `config.py`, set `AI_PROVIDER = "ollama"`. Ollama must be running locally at the configured `OLLAMA_URL` (`http://localhost:11434/api/chat`). No Gemini key is needed for Ollama.
+Add your private Gemini key to `.env` if `AI_PROVIDER = "gemini"`, then run:
+
+```powershell
+python main.py
+```
+
+Gemini free-tier quotas apply. Avoid sensitive information in chat because free-tier prompts and responses may be used to improve Google's products. Never commit or share `.env`.
+
+Jarvis defaults to `MODE = "both"`: it listens first and falls back to typed input. Set `MODE` in `config.py` to `typed` or `voice` if preferred. Current provider settings remain in `config.py`.
+
+For local AI chat, install [Ollama](https://ollama.com), run `ollama run gemma3:1b`, then set `AI_PROVIDER = "ollama"` in `config.py`. The model downloads on first use. No Gemini key is needed for Ollama.
 
 ## Commands
 
-- `open youtube`, `open google`, or `open github`
-- `open vscode`, `open chrome`, `open notepad`, or `open codex`
+- `open youtube`, `open google`, `open github`
+- `open vscode`, `open chrome`, `open notepad`, `open codex`
 - `time` / `what's the time`; `date` / `what's the date`
-- `news` or `latest news` (fetches up to five headlines from the configured BBC RSS feed)
+- `news`, `latest news`, or `tell me the news`
 - Ask any other question to chat with the selected AI provider
+- `explain this code`: select code in another app, then ask Jarvis. It copies the selection, prints the explanation, and speaks a short summary.
+- `fix this code`: select code, then ask Jarvis. It displays an AI suggestion only; Jarvis does not paste, save, or run it.
+- `take a note <text>` and `show my notes`
+- `my name is <name>`, `remember I prefer <preference>`, and `what do you remember about me`
+- `save my work to GitHub`: Jarvis shows the changed files, asks for typed approval to stage, requests a commit message and typed approval, then asks for a separate typed approval before pushing.
 - `exit` or `quit`
 
-Only names listed in `config.py` can be opened. Check the VS Code, Chrome, and Codex paths for your computer. In `both` mode, Jarvis listens first, then falls back to typed input if it cannot recognize speech. Set `MODE` in `config.py` to `voice` or `typed` to choose one input mode. Replies are printed in every mode; voice and both modes also speak replies.
+Only selected clipboard text is sent for code help. The copied text is treated as data, not as a command. Read an AI fix before using it yourself; Jarvis never applies one.
 
-## Microphone troubleshooting
+## GitHub safety
 
-- Check Windows microphone privacy settings and the default input device.
-- If PyAudio installation fails, share the exact error before trying another audio library or installing system build tools.
-- Speech recognition uses an online service and needs internet. Silence, microphone errors, and recognition/network failures return to typed input in `both` mode.
-- `pyttsx3` speaks offline using the installed Windows speech engine.
+The Git helper runs only `git status`, `git add -A`, `git commit -m`, and `git push`, as argument lists in the project folder. It requires typed approval before staging, committing, and pushing. Declining the push leaves the commit local. The helper does not run Git during tests.
+
+## Local notes and memory
+
+Notes are appended to `data/notes.txt`. Name, preferences, and the latest 20 commands are saved in `data/memory.json`. These files and the `data/` folder are ignored by Git. The configured Gemini key is redacted from command history and rejected if included in a commit message.
 
 ## Tests
 
-Run all unit tests with:
+Run all tests with:
 
 ```powershell
 python -m unittest discover tests
 ```
 
-Tests mock the AI providers and RSS network request; they do not use a real API key, network, microphone, or speaker.
+Tests mock clipboard, AI, confirmation, and Git behavior. They do not interact with a real selection, microphone, GitHub login, or push.
 
-## Logs and privacy
+## Microphone and speaker troubleshooting
 
-Jarvis writes command and result entries to `logs/jarvis.log` and redacts the configured Gemini key. If the log cannot be written, the assistant continues. `.env`, logs, and the virtual environment are ignored by Git. AI providers receive the chat text and the fixed assistant instructions, not `.env` contents or local files. The news skill requests only the configured public RSS feed.
+Check Windows microphone privacy settings and the default input device. Voice recognition needs internet. `pyttsx3` uses the installed Windows speech engine; check the selected output device and volume if replies are not audible. If PyAudio installation fails, keep the error and ask before trying another audio library or installing build tools.
+
+Jarvis records command outcomes in `logs/jarvis.log` when logging is available. Suggested code fixes are excluded from persistent logs. API keys are redacted from logs and command history.
+
+## Manual checks
+
+- Select harmless code and try explain and fix. Confirm the fix is only displayed and that explain speaks a short summary.
+- Save and show a note; save a name and preference; ask Jarvis what it remembers.
+- Try `save my work to GitHub` and decline each typed prompt in turn. No GitHub action should occur after a declined prompt. Only test a real push when you intend to publish your current project changes.
+- Earlier-stage manual checks remain: real Gemini/Ollama, RSS internet access, microphone, speaker, and configured app paths.
+
+`.env`, `venv/`, `data/`, `logs/`, generated bytecode, and local state are excluded from Git.

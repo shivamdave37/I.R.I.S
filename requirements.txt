@@ -5,3 +5,5 @@ google-genai
 python-dotenv
 requests
 feedparser
+pyautogui
+pyperclip

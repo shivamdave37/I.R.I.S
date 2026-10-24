@@ -7,6 +7,7 @@ import config
 import router
 import voice
 from dotenv import load_dotenv
+from skills import memory
 
 
 def setup_logging():
@@ -91,10 +92,19 @@ def run():
             if command is None or not command.strip():
                 continue
 
+            # Keep the most recent commands without letting memory errors stop the loop.
+            memory.record_command(command)
             reply = router.handle(command)
             print(f"Jarvis: {reply}")
-            log_action(command, reply)
-            if speak_replies:
+            normalized_command = router.normalize(command)
+            # A suggested fix is shown only, so do not copy the AI code into persistent logs.
+            logged_reply = "AI-suggested fix displayed only; not saved." if normalized_command.startswith("fix this code") else reply
+            log_action(command, logged_reply)
+            # Code help already speaks a short explanation summary; fixes stay on screen only.
+            should_speak_reply = not normalized_command.startswith("fix this code")
+            if normalized_command.startswith("explain this code"):
+                should_speak_reply = False
+            if speak_replies and should_speak_reply:
                 voice.speak(reply)
             # Stop loop after the goodbye reply has been queued.
             if router.is_exit_command(command):

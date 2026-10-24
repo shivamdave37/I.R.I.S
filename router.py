@@ -4,7 +4,7 @@ import re
 
 import config
 from ai import ask_ai
-from skills import apps, news, timeinfo, web
+from skills import apps, code_helper, github_tools, memory, news, notes, timeinfo, web
 
 
 def normalize(command):
@@ -58,6 +58,27 @@ def handle(command):
     # Direct news queries.
     if normalized in {"news", "latest news", "whats the news", "what is the news", "tell me the news"}:
         return news.get_news()
+
+    if normalized.startswith("explain this code"):
+        return code_helper.explain_code()
+    if normalized.startswith("fix this code"):
+        return code_helper.suggest_fix()
+    if normalized == "save my work to github":
+        return github_tools.save_to_github()
+    if normalized.startswith("take a note"):
+        # Keep the user's original note text instead of its normalized command form.
+        note_text = str(command).strip()[len("take a note"):].strip()
+        return notes.add_note(note_text)
+    if normalized == "show my notes":
+        return notes.show_notes()
+    if normalized.startswith("my name is "):
+        name = str(command).strip()[len("my name is"):].strip()
+        return memory.remember_name(name)
+    if normalized in {"my name", "what is my name", "what do you remember about me"}:
+        return memory.get_memory()
+    if normalized.startswith("remember i prefer "):
+        preference = str(command).strip()[len("remember i prefer"):].strip()
+        return memory.remember_preference(preference)
 
     # Any other command, including punctuation-only input, goes to the fallback.
     return fallback(command)

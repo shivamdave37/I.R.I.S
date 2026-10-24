@@ -1,5 +1,7 @@
 """Settings for the Mini Jarvis project."""
 
+import os
+
 MODE = "both"
 AI_PROVIDER = "gemini"
 AI_FALLBACK_PROVIDER = None
@@ -8,6 +10,8 @@ GEMINI_MODEL = "gemini-3.5-flash-lite"
 OLLAMA_MODEL = "gemma3:1b"
 OLLAMA_URL = "http://localhost:11434/api/chat"
 NEWS_RSS_URL = "https://feeds.bbci.co.uk/news/rss.xml"
+PROJECT_FOLDER = os.path.dirname(os.path.abspath(__file__))
+DATA_FOLDER = os.path.join(PROJECT_FOLDER, "data")
 
 WEBSITES = {
     "youtube": "https://www.youtube.com",
