@@ -13,6 +13,10 @@ def resources_for(command):
         return ["GIT_REPO"]
     if text.startswith("take a note"):
         return ["NOTES_FILE"]
+    if text.startswith(("add app ", "add website ", "remove app ", "remove website ")):
+        return ["USER_CONFIG_FILE"]
+    if text in {"list apps", "list websites"}:
+        return []
     if text == "show my notes":
         return ["NOTES_FILE"]
     if text.startswith("my name is ") or text.startswith("remember i prefer ") or text in {"my name", "what is my name", "what do you remember about me"}:

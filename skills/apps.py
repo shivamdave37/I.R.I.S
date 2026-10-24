@@ -5,6 +5,12 @@ import shutil
 import subprocess
 
 import config
+from skills.user_config import learned_apps
+
+
+def available_apps():
+    """Return built-in apps plus learned apps without allowing an override."""
+    return {**learned_apps(), **config.APPS}
 
 
 def launch_app(app_path):
@@ -25,7 +31,7 @@ def is_placeholder(app_path):
 
 def open_app(name):
     """Open an app only when its name and path are approved in settings."""
-    app_path = config.APPS.get(name)
+    app_path = available_apps().get(name)
     # Strictly refuse apps not configured in settings.
     if app_path is None:
         return f"I can't open {name}; it is not in the approved app list."

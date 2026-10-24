@@ -1,4 +1,4 @@
-# Stage 5 Review Pack
+# Stage 6 Review Pack (6A complete)
 
 ## Folder structure
 
@@ -11,7 +11,7 @@
 ├── PROMPTS.md
 ├── README.md
 ├── REVIEW.md
-├── STAGE_6.md              # Human-authored future plan
+├── STAGE_6.md              # Stage 6 build and review requirements
 ├── STAGE_7.md              # Human-authored future plan
 ├── SPEC.md
 ├── ai.py
@@ -40,6 +40,7 @@
 │   ├── memory.py
 │   ├── news.py
 │   ├── notes.py
+│   ├── user_config.py       # approval-gated learned apps and websites
 │   ├── timeinfo.py
 │   └── web.py
 └── tests/
@@ -48,10 +49,11 @@
     ├── test_news.py
     ├── test_router.py
     ├── test_stage4.py
+    ├── test_stage6.py
     └── test_voice.py
 ```
 
-`STAGE_6.md` and `STAGE_7.md` are user-authored untracked planning files in the project root. They are intentionally excluded from the Stage 4 builder commit.
+`STAGE_6.md` is tracked as the current stage prompt. `STAGE_7.md` remains a human-authored untracked planning file and was not changed.
 
 ## What the files do
 
@@ -66,6 +68,7 @@
 - `skills/notes.py` saves and reads `data/notes.txt` with a file lock.
 - `skills/memory.py` stores a name, preferences, and the latest 20 commands in `data/memory.json` with a file lock; it redacts the configured Gemini key from command history.
 - `skills/news.py`, `skills/apps.py`, `skills/web.py`, and `skills/timeinfo.py` implement news, approved app/site opening, and time/date behavior.
+- `skills/user_config.py` searches Start Menu shortcuts, validates approved website URLs and app paths, and stores confirmed learned entries under `data/user_config.json`.
 - `tests/` has offline unit tests for voice, routing, AI/news, Stage 4 helpers, and Iris.
 - `iris/tasks.py` stores task data and the fixed lifecycle states.
 - `iris/resources.py` atomically reserves or releases Iris's logical resources.
@@ -92,10 +95,18 @@ Install packages into the project virtual environment with `python -m pip instal
 - Iris reserves all requested resources in one locked operation; the AI planner cannot select a Git or file-writing skill for an unknown request.
 - Task execution is serialized so worker prompts share one input path. Resource ownership and priority selection remain managed by Iris.
 - A timed-out or cancelled worker keeps its resources until it exits; Python cannot kill a blocked worker safely. `stop all` waits up to two seconds and reports when a blocking step is still finishing. This preserves exclusive resource ownership but cannot guarantee immediate release for an unusually long non-pausable step.
-- Sensitive `GIT_REPO`, `SCREEN_FOCUS`, and `NOTES_FILE` approvals require typed approval every time. Non-sensitive session and always grants use `data/permissions.json`.
+- Sensitive `GIT_REPO`, `SCREEN_FOCUS`, `NOTES_FILE`, and `USER_CONFIG_FILE` approvals require typed approval every time. Non-sensitive session and always grants use `data/permissions.json`.
 - The demo and tests ran in the project's virtual environment. Real voice devices, app paths, Gemini/Ollama/RSS services, clipboard selection, and GitHub login/push still require a human check.
 - To keep interactive Git confirmations, permission answers, and admin commands on one keyboard path, Iris starts one task at a time. The resource manager still supports atomic ownership of independent resources; adding concurrent task workers would need a shared UI loop that preserves this prompt guarantee.
 - Unknown or complex user requests use one validated `chat` plan step. Multi-action commands are queued as separate tasks with `queue:` until a later version defines safe step arguments.
+
+## Stage 6A builder notes
+
+- Added `USER_CONFIG_FILE` as a sensitive resource; Iris requires a typed yes for each task that writes user app or website settings. The command then shows the exact target and requires a second typed yes before saving or removing it.
+- Learned app and website entries live only in ignored `data/user_config.json`. Built-in names take precedence over saved values. The settings path is constrained to the project's `data/` folder, and writes use a lock and atomic replacement.
+- App commands search current-user and all-users Start Menu `.lnk` files. If no shortcut is found, Jarvis accepts only an existing `.exe` or `.lnk` path. Website entries require HTTPS and a valid hostname.
+- `tests/test_stage6.py` covers validation, typed approvals, file handling, built-in protection, routing, and the sensitive permission. Full suite: 96 tests passed.
+- Actual Start Menu discovery and real app paths need a Windows human check. Wake-word and learned-skill features are not implemented yet.
 
 ## Reviewer findings
 

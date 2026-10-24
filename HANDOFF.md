@@ -1,8 +1,9 @@
-TURN: human
-STAGE: 5
-ROUND: 1
-BUILDER NOTES: Stage 5A core, 5B controls/permissions, and 5C demo/docs are complete. Commits: 271e33b, be25379, f71862d. Tag: stage-5. Full suite: 82 tests passed; demo and compile checks passed.
-UNSURE ABOUT: Actual Windows microphone/speaker interaction, app paths, live provider behavior, clipboard, and GitHub authentication cannot be verified here. Iris runs one task at a time to keep prompts on one keyboard queue.
-REVIEWER FIXED: Fixed _audit(None, event) silently dropping admin-only log entries (status, grants, revoke) — SPEC 10.13 requires every admin command to be written to jarvis.log. The fix adds a None guard so admin events log with task_id='admin'. Added test_admin_audit_logged_without_task to cover this. Full suite: 83 tests passed. Tag: stage-5-reviewed.
-REVIEWER UNRESOLVED (needs builder or human): SPEC.md 10.13 says stop all must free every resource within a few seconds, while 10.5 says Iris must wait for non-pausable file/Git steps and Python cannot kill a blocked thread. Current safe behavior waits two seconds, reports a still-running blocking step, and keeps its resource locked until that worker exits. Confirm whether that exception is acceptable or whether the task design should change.
-NEEDS HUMAN TEST (mic, speakers, app paths, clipboard, GitHub login): Enable USE_IRIS in config.py; test voice and typed input, permission allow/deny/timeout, saved grants/revoke, admin controls, pause/resume/cancel/stop all, approved apps, and Git confirmations. Observe stop all during a long Git or file step; it may report that the step is still finishing. Test a real push only if you intend to publish. Stage 1-4 microphone/speaker, app paths, AI providers/RSS, clipboard, and GitHub login checks remain outstanding.
+TURN: builder
+STAGE: 6
+ROUND: 0
+SUBSTEP: 6A
+BUILDER NOTES: Stage 6A complete: approved apps/websites can be added, listed, removed, and opened from the merged built-in/user lists. Setup commit 262d478 and its merge are pushed. Stage 6A suite: 96 tests passed.
+UNSURE ABOUT: Start Menu shortcut discovery and real Windows app paths need a human session. Wake-word and learned-skill substeps remain to be built.
+REVIEWER FIXED: Stage 5 review fixed _audit(None, event) silently dropping admin-only log entries; admin events now log with task_id='admin'. Added test_admin_audit_logged_without_task. Stage 5 reviewed suite: 83 tests passed. Tag: stage-5-reviewed.
+REVIEWER UNRESOLVED (needs builder or human): Stage 5 SPEC 10.13 says stop all frees every resource within a few seconds, while 10.5 requires waiting for non-pausable file/Git steps. Current behavior waits two seconds, reports a still-running step, and keeps its resource locked until that worker exits. This remains documented for the human.
+NEEDS HUMAN TEST (mic, speakers, app paths, clipboard, GitHub login): For Stage 6A, enable USE_IRIS, add a real app and website, inspect each target, approve with typed yes, restart, list, open, and remove an entry. Test Start Menu matches and a typed full path. Earlier mic/speaker, AI providers/RSS, clipboard, GitHub login, permission flow, and stop-all checks also remain manual.

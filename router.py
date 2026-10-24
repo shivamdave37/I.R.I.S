@@ -5,6 +5,7 @@ import re
 import config
 from ai import ask_ai
 from skills import apps, code_helper, github_tools, memory, news, notes, timeinfo, web
+from skills import user_config
 
 
 def normalize(command):
@@ -43,11 +44,17 @@ def handle(command):
     # Handle website and app opening commands starting with 'open '.
     if normalized.startswith("open "):
         name = normalized[5:].strip()
-        if name in config.WEBSITES:
+        if name in web.available_websites():
             return web.open_website(name)
-        if name in config.APPS:
+        if name in apps.available_apps():
             return apps.open_app(name)
         return f"I can't open {name}; it is not on the approved list."
+
+    # Learned app and website changes require Iris so its sensitive permission gate applies.
+    if normalized.startswith(("add app ", "add website ", "remove app ", "remove website ", "list apps", "list websites")):
+        if not getattr(config, "USE_IRIS", False):
+            return "Enable Iris in config.py to manage learned apps and websites."
+        return user_config.handle(command)
 
     # Direct time queries.
     if normalized in {"time", "what is the time", "whats the time", "tell me the time"}:

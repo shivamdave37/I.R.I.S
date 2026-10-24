@@ -1,6 +1,6 @@
-# Mini Jarvis — Stage 5
+# Mini Jarvis — Stage 6 in progress (6A complete)
 
-Stage 5 adds Iris, a task supervisor for Jarvis. It orders tasks, reserves logical resources together, shows task status, and supports pause, resume, cancel, priority, and emergency stop controls. It asks before using protected resources. Iris uses Python's standard library; existing project libraries still power the Stage 1–4 Jarvis skills.
+Stage 6 is being built in three parts. The completed part, 6A, adds user-approved apps and websites. Wake-word listening and learned skills are not available yet. Iris remains the task supervisor from Stage 5.
 
 ## Setup and run
 
@@ -39,7 +39,13 @@ For local AI chat, install [Ollama](https://ollama.com), run `ollama run gemma3:
 - `take a note <text>` and `show my notes`
 - `my name is <name>`, `remember I prefer <preference>`, and `what do you remember about me`
 - `save my work to GitHub`: Jarvis shows the changed files, asks for typed approval to stage, requests a commit message and typed approval, then asks for a separate typed approval before pushing.
+- `add app <name>` and `add website <name> <url>`: Iris finds or validates the target, shows it, and saves only after typed approval. App and website names can use letters, numbers, and spaces.
+- `remove app <name>` and `remove website <name>`: show the learned entry and remove it only after typed approval.
+- `list apps` and `list websites`: show built-in and learned entries.
+- `open <learned name>`: open an app or website that you added and approved.
 - `exit` or `quit`
+
+Set `USE_IRIS = True` in `config.py` to use the Stage 6 task, permission, and learned app flows. User app and website entries are stored in the ignored `data/user_config.json`; missing or damaged settings start empty and produce a warning. Learned entries cannot replace built-in names. Adding an app searches the current-user and all-users Start Menu shortcuts first; if no shortcut matches, Jarvis asks for an existing `.exe` or `.lnk` path.
 
 When Iris is enabled, ordinary requests are queued as tasks. Type or say `status` to see each task's state, priority, resource ownership, estimate, elapsed time, and result. Admin controls are `pause <task>`, `resume <task>`, `cancel <task>`, `switch to <task>`, `priority <task> <number>`, `grants`, `revoke <resource>`, and `stop all`. Use the task ID or exact displayed name. `stop all` cancels current work but keeps Jarvis running. If a blocked or non-pausable step is still finishing, Iris keeps its resource reserved until the worker exits and reports that it is still finishing.
 
@@ -79,7 +85,7 @@ Jarvis records command outcomes in `logs/jarvis.log` when logging is available. 
 
 ## Iris permissions
 
-Before a task uses resources, Iris shows one prompt listing each resource and its reason. Type one comma-separated answer per listed resource in the same order: `once`, `session`, `always`, or `deny`. `GIT_REPO`, `SCREEN_FOCUS`, and `NOTES_FILE` are sensitive: type `yes` or `deny` for each such item every time. Sensitive grants cannot be saved. No answer after 60 seconds is denied. Saved non-sensitive `always` grants live in ignored `data/permissions.json`; `grants` lists them and `revoke <resource>` removes them.
+Before a task uses resources, Iris shows one prompt listing each resource and its reason. Type one comma-separated answer per listed resource in the same order: `once`, `session`, `always`, or `deny`. `GIT_REPO`, `SCREEN_FOCUS`, `NOTES_FILE`, and `USER_CONFIG_FILE` are sensitive: type `yes` or `deny` for each such item every time. Sensitive grants cannot be saved. No answer after 60 seconds is denied. Saved non-sensitive `always` grants live in ignored `data/permissions.json`; `grants` lists them and `revoke <resource>` removes them.
 
 Worker prompts such as Git confirmations and commit messages go through the main keyboard loop, so worker threads do not read the terminal directly. Admin commands remain available while a prompt is open.
 
@@ -91,5 +97,7 @@ Worker prompts such as Git confirmations and commit messages go through the main
 - Earlier-stage manual checks remain: real Gemini/Ollama, RSS internet access, microphone, speaker, and configured app paths.
 - Set `USE_IRIS = True`; try a simple task, inspect `status`, allow and deny separate resources, save and revoke a non-sensitive grant, and test `pause`, `resume`, `cancel`, `priority`, and `stop all` with the displayed task ID.
 - Try a task that needs `SCREEN_FOCUS` or `GIT_REPO` and confirm it asks for typed approval every time. Test the Git workflow only when you are ready to stage or publish the listed project changes.
+- With Iris enabled, add a real app and website, check their target before typing yes, restart Jarvis, list them, and open them. Try an invalid name and URL, and remove one learned entry.
+- Stage 6 wake-word and learned-skill manual checks are documented after those substeps are implemented. Read every proposed skill before typing yes; the checker and subprocess test are risk reductions, not a true Windows sandbox.
 
 `.env`, `venv/`, `data/`, `logs/`, generated bytecode, and local state are excluded from Git.

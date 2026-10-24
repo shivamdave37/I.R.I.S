@@ -10,6 +10,12 @@ from ai import ask_ai
 def plan(command):
     """Return a fixed known-command plan or one strictly validated AI plan."""
     text = command.lower().strip()
+    if text.startswith("open "):
+        from skills.apps import available_apps
+        from skills.web import available_websites
+        target = text[5:].strip()
+        if target in available_apps() or target in available_websites():
+            return {"steps": ["open"], "resources": _resources(command), "estimate_seconds": 2}
     known = [
         (r"^(open youtube|open google|open github|open vscode|open chrome|open notepad|open codex)$", "open"),
         (r"^(time|what'?s the time|what is the time|tell me the time|date|what'?s the date|what is the date|tell me the date|exit|quit)$", "timeinfo"),
@@ -17,6 +23,7 @@ def plan(command):
         (r"^explain this code.*$", "code_helper"), (r"^fix this code.*$", "code_helper"),
         (r"^save my work to github$", "github_tools"), (r"^take a note.*$", "notes"),
         (r"^show my notes$", "notes"), (r"^my name is .*|^remember i prefer .*|^what do you remember about me$", "memory"),
+        (r"^(add app .+|add website .+|remove app .+|remove website .+|list apps|list websites)$", "user_config"),
     ]
     for pattern, skill in known:
         if re.match(pattern, text):

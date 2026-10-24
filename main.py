@@ -241,6 +241,7 @@ def read_command(mode):
 def run():
     """Read commands in the configured mode and stop cleanly on exit or Ctrl+C."""
     setup_logging()
+    router.user_config.initialize()
     # Normalize configured mode to lowercase and strip whitespace.
     configured_mode = getattr(config, "MODE", "both")
     mode = configured_mode.strip().lower() if isinstance(configured_mode, str) else "both"
