@@ -1,9 +1,8 @@
-TURN: reviewer
+TURN: human
 STAGE: 7
-ROUND: 0
-SUBSTEP: 7C
+ROUND: 1
 BUILDER NOTES: Stage 6 review is complete (127 tests passed; tag stage-6-reviewed). The human confirmed the Stage 6A website add-and-restart check passed. Stage 7 setup is committed and pushed; the backup-location conflict is resolved: the fixed updater apply/rollback workflow alone may create, restore, and clean data/backups, while patch proposals must refuse that TIER 0 path. Stage 7A and 7B are committed locally, and 7C is complete. It adds typed update/change requests, strict one-file AI JSON, isolated chat history, static plus sandbox checks, and deterministic hourly suggestions that need typed `prepare it`. Full suite: 162 tests passed using the project virtual environment with filesystem access. The builder's final Stage 7 commit and tag are local; do not push.
 UNSURE ABOUT: Real Windows launcher restart/health and rollback flow needs human testing. The Stage 7 sandbox copy uses the current interpreter and installed dependencies. Suggestions use repeated chat fallback or failed skill state, not AI reply text. Stage 6 manual checks for microphone/wake, learned-skill approvals, and earlier integrations remain pending. The requested Iris desktop interface is separate from Stage 7.
-REVIEWER FIXED: None; pending Antigravity review.
-REVIEWER UNRESOLVED (needs builder or human): None yet; pending Antigravity review.
+REVIEWER FIXED: Added `# PROTECTED` markers to `iris/iris.py` (`_permission_allowed`) and `iris/agent_permissions.py` (`resources_for`) to prevent AI patches from tampering with the permission callback or sensitive resource mappings. Added tests `test_permission_callback_cannot_be_patched_out` and `test_resource_mapping_cannot_be_patched_out` in `tests/test_updater_patcher.py`. Full suite: 164 tests passed.
+REVIEWER UNRESOLVED (needs builder or human): None. Note that launcher health monitoring and automatic rollback require starting Iris via `python launcher.py` (running `python main.py` directly executes without the outer health watchdog).
 NEEDS HUMAN TEST (mic, speakers, app paths, clipboard, GitHub login): Follow STAGE_7.md section 5: start with `python launcher.py`, make and read a harmless proposal, try why/deny/other way/revise, approve a deliberately broken change and verify automatic rollback, confirm a TIER 0 target is refused, and verify no push occurs. Stage 6 wake/mic/speakers, app paths, learned skills, and earlier integrations remain pending except the website persistence check the human confirmed.
