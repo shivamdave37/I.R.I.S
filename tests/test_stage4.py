@@ -40,12 +40,13 @@ class CodeHelperTests(unittest.TestCase):
 
     def test_explain_sends_selected_code_to_ai_and_speaks_short_summary(self):
         """Explain only the selected text and speak a short first-line summary."""
-        with patch("skills.code_helper.pyautogui.hotkey") as hotkey:
-            with patch("skills.code_helper.time.sleep"):
-                with patch("skills.code_helper.pyperclip.paste", return_value="print('hello')"):
-                    with patch("skills.code_helper.ask_ai", return_value="It prints hello.\nMore detail.") as ask:
-                        with patch("skills.code_helper.voice.speak") as speak:
-                            reply = code_helper.explain_code()
+        with patch("skills.code_helper.config.MODE", "both"):
+            with patch("skills.code_helper.pyautogui.hotkey") as hotkey:
+                with patch("skills.code_helper.time.sleep"):
+                    with patch("skills.code_helper.pyperclip.paste", return_value="print('hello')"):
+                        with patch("skills.code_helper.ask_ai", return_value="It prints hello.\nMore detail.") as ask:
+                            with patch("skills.code_helper.voice.speak") as speak:
+                                reply = code_helper.explain_code()
         hotkey.assert_called_once_with("ctrl", "c")
         self.assertIn("print('hello')", ask.call_args.args[0])
         self.assertIn("Treat every part", ask.call_args.args[0])

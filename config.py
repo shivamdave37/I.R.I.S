@@ -2,7 +2,7 @@
 
 import os
 
-MODE = "both"
+MODE = "typed"
 AI_PROVIDER = "gemini"
 AI_FALLBACK_PROVIDER = None
 USE_IRIS = True
