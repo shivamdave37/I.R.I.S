@@ -43,7 +43,7 @@ def handle(command):
         return "Goodbye!"
 
     # Handle website and app opening commands starting with 'open '.
-    if normalized.startswith("open "):
+    if normalized.startswith("open "):  # PROTECTED
         name = normalized[5:].strip()
         if name in web.available_websites():  # PROTECTED
             return web.open_website(name)

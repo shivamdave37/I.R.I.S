@@ -48,4 +48,4 @@ def inspect(command):
     if isinstance(mode, str) and mode.strip().lower() in {"voice", "both"}:
         # Voice tasks share the microphone and speaker as one exclusive resource.
         resources = sorted(set(resources) | {"MIC_SPEAKER"})
-    return resources, all(resource in KNOWN_RESOURCES for resource in resources)
+    return resources, all(resource in KNOWN_RESOURCES for resource in resources)  # PROTECTED

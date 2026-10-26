@@ -26,6 +26,46 @@ def _run_git(arguments):
     return result
 
 
+def commit_update(files, identifier, reason):
+    """Commit only named approved updater files locally, without pushing."""
+    from updater.policy import check_path
+    if (not files or any(check_path(path) != "tier1" for path in files)  # PROTECTED
+            or not isinstance(identifier, str) or not identifier.isalnum()):
+        return False, "The updater commit request is invalid."
+    try:
+        staged = _run_git(["diff", "--cached", "--name-only"])
+        if staged.returncode != 0 or staged.stdout.strip():  # PROTECTED
+            return False, "The Git index is not empty; nothing was committed."
+        added = _run_git(["add", "--"] + sorted(files))  # PROTECTED
+        if added.returncode != 0:
+            return False, "Git could not stage the approved updater files."
+        staged = _run_git(["diff", "--cached", "--name-only"])
+        staged_names = sorted(line.replace("\\", "/") for line in staged.stdout.splitlines())
+        if staged.returncode != 0 or staged_names != sorted(files):  # PROTECTED
+            _run_git(["reset", "--"] + sorted(files))
+            return False, "Git did not stage exactly the approved updater files."
+        message = f"Iris update {identifier}: {str(reason).strip()}"
+        if "\n" in message or "\r" in message or len(message) > 240:
+            _run_git(["reset", "--"] + sorted(files))
+            return False, "The updater commit message is invalid."
+        try:
+            from dotenv import load_dotenv
+            load_dotenv()
+            secret = os.getenv("GEMINI_API_KEY")
+            if secret and secret in message:
+                _run_git(["reset", "--"] + sorted(files))
+                return False, "The updater commit message contains protected text."
+        except Exception:
+            pass
+        committed = _run_git(["commit", "-m", message])  # PROTECTED
+        if committed.returncode != 0:
+            _run_git(["reset", "--"] + sorted(files))
+            return False, "The local updater commit failed."
+    except Exception:
+        return False, "The updater could not make its fixed local commit."
+    return True, "The approved update was committed locally; nothing was pushed."
+
+
 def save_to_github():
     """Show changed files and require typed approval before each risky Git action."""
     try:

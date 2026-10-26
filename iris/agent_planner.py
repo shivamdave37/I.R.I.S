@@ -42,7 +42,7 @@ def plan(command):
             resources = parsed["resources"]
             seconds = parsed["estimate_seconds"]
             # Unclassified requests stay on the chat path; AI cannot choose an action skill.
-            if (not isinstance(steps, list) or steps != ["chat"] or not all(isinstance(step, str) and step in allowed_skills for step in steps)
+            if (not isinstance(steps, list) or steps != ["chat"] or not all(isinstance(step, str) and step in allowed_skills for step in steps)  # PROTECTED
                     or not isinstance(resources, list) or not all(isinstance(item, str) and item in allowed_resources for item in resources)
                     or not isinstance(seconds, (int, float)) or isinstance(seconds, bool) or seconds <= 0):
                 raise ValueError("Plan fields are invalid")

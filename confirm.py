@@ -3,6 +3,20 @@
 import voice
 
 
+def ask_choice(question, choices):
+    """Return one exact typed choice from a short fixed list."""
+    print(question)
+    try:
+        from iris.console import request_input
+        answer = request_input("Choice: ")
+    except (EOFError, KeyboardInterrupt):
+        return None
+    if answer is None:
+        return None
+    answer = str(answer).strip().lower()
+    return answer if answer in choices else None
+
+
 def ask_yes_no(question, require_typed=False):
     """Return True only for an explicit yes answer from an allowed input source."""
     print(f"{question} (yes/no)")

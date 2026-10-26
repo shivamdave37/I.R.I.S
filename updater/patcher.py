@@ -90,11 +90,29 @@ def _function_map(tree):
 
 
 def _check_protected_lines(old_text, new_text):
-    """Require every protected line to remain byte-for-byte at its original line number."""
+    """Keep marked lines and their containing function logic unchanged."""
     old_lines = old_text.splitlines(keepends=True)
     new_lines = new_text.splitlines(keepends=True)
     markers = [(index, line) for index, line in enumerate(old_lines) if "# PROTECTED" in line]
-    return all(index < len(new_lines) and new_lines[index] == line for index, line in markers), len(markers)
+    if not all(index < len(new_lines) and new_lines[index] == line for index, line in markers):
+        return False, len(markers)
+    old_tree = ast.parse(old_text)
+    new_tree = ast.parse(new_text)
+    old_functions = {(node.name, node.lineno): ast.dump(node, include_attributes=False)
+                     for node in ast.walk(old_tree) if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
+    new_functions = {(node.name, node.lineno): ast.dump(node, include_attributes=False)
+                     for node in ast.walk(new_tree) if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
+    for line_number, _ in markers:
+        protected_line = line_number + 1
+        containing = [node for node in ast.walk(old_tree)
+                      if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                      and node.lineno <= protected_line <= node.end_lineno]
+        if containing:
+            function = min(containing, key=lambda node: node.end_lineno - node.lineno)
+            key = (function.name, function.lineno)
+            if old_functions.get(key) != new_functions.get(key):
+                return False, len(markers)
+    return True, len(markers)
 
 
 def _scan_file(relative_path, old_text, new_text, old_tree, new_tree):

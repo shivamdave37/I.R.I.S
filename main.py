@@ -16,8 +16,55 @@ def _is_admin_command(command):
     """Recognize only the explicit Iris control-channel commands."""
     words = command.lower().split()
     normalized = command.lower().strip()
-    return (normalized in {"status", "grants", "stop all"}
+    return (normalized in {"status", "grants", "stop all", "updates", "rollback last update", "restart"}
+            or normalized.startswith("show update ")
             or any(normalized.startswith(action + " ") for action in ("pause", "resume", "cancel", "revoke", "priority", "switch to")))
+
+
+def _update_prompt(question, choices):
+    """Read a typed updater answer and validate fixed choices when supplied."""
+    answer = read_console_line(question + "\nChoice: ")  # PROTECTED
+    if answer is None:
+        return None
+    answer = answer.strip().lower()
+    if choices and answer not in choices:  # PROTECTED
+        print("That choice was not accepted.")
+        return None
+    return answer
+
+
+def _handle_update_command(command, supervisor):
+    """Show proposals and handle typed update approval, rollback, or restart."""
+    from updater import apply as updater_apply, proposal as proposal_store
+    normalized = command.strip().lower()
+    if normalized == "updates":
+        proposals = proposal_store.load_proposals()
+        if not proposals:
+            return "There are no saved update proposals."
+        return "Update proposals:\n" + "\n".join(f"{item.id} {item.status}: {item.reason}" for item in proposals)
+    if normalized.startswith("show update "):
+        identifier = command.strip().split()[-1]
+        approval, result = updater_apply.review_proposal(identifier, supervisor=supervisor, ask=_update_prompt)  # PROTECTED
+        if approval is None:
+            return result
+        applied, message = updater_apply.apply_approved(approval, supervisor=supervisor)  # PROTECTED
+        if not applied:
+            return message
+        print(message)
+        if _update_prompt("Type yes to restart through launcher.py", {"yes"}) == "yes":  # PROTECTED
+            raise SystemExit(75)
+        return "Update is committed locally. Run python launcher.py when you are ready to restart."
+    if normalized == "rollback last update":
+        result = updater_apply.rollback_last(ask=_update_prompt)  # PROTECTED
+        print(result)
+        if "restored" in result.lower() and _update_prompt("Type yes to restart through launcher.py", {"yes"}) == "yes":  # PROTECTED
+            raise SystemExit(75)
+        return result
+    if normalized == "restart":
+        if _update_prompt("Type yes to restart Jarvis through launcher.py", {"yes"}) == "yes":  # PROTECTED
+            raise SystemExit(75)
+        return "Restart cancelled."
+    return "Unknown updater command."
 
 
 def _is_rules_change(command):
@@ -98,6 +145,7 @@ def run_iris(mode):
     supervisor.permission_manager = permission_manager
     input_broker.enabled = True
     wake_listener = wake.create_listener() if getattr(config, "WAKE_ENABLED", False) and mode != "typed" else None
+    _write_health_marker()  # PROTECTED
     print("Iris supervision is enabled. Type or say 'status' to inspect tasks.")
     deferred_command = None
     deferred_is_typed = False
@@ -122,8 +170,12 @@ def run_iris(mode):
                     break
                 if answer is None:
                     continue
-                if _is_admin_command(answer):
-                    print(supervisor.handle_admin(answer))
+                if _is_admin_command(answer):  # PROTECTED
+                    if (answer.strip().lower() in {"updates", "rollback last update", "restart"}
+                            or answer.strip().lower().startswith("show update ")):
+                        print(_handle_update_command(answer, supervisor))
+                    else:
+                        print(supervisor.handle_admin(answer))
                 elif prompt_kind == "permission":
                     permission = supervisor.pending_permission_prompt()
                     if permission is None or not supervisor.answer_permission(permission[0], answer, typed=True):
@@ -199,8 +251,12 @@ def run_iris(mode):
                 print("Jarvis: Goodbye!")
                 break
             normalized = router.normalize(command)
-            if _is_admin_command(normalized):
-                print(supervisor.handle_admin(normalized))
+            if _is_admin_command(normalized):  # PROTECTED
+                if (normalized in {"updates", "rollback last update", "restart"}
+                        or normalized.startswith("show update ")):
+                    print(_handle_update_command(command, supervisor))
+                else:
+                    print(supervisor.handle_admin(normalized))
                 continue
             # Runtime requests cannot alter config.py or the safety limits.
             if _is_rules_change(normalized):
@@ -238,6 +294,22 @@ def setup_logging():
     except Exception:
         # Jarvis should remain usable even when the log folder cannot be written.
         pass
+
+
+def _write_health_marker():
+    """Record a fresh startup marker for the protected launcher check."""
+    project = os.path.abspath(config.PROJECT_FOLDER)
+    data_folder = os.path.join(project, "data")
+    marker = os.path.join(data_folder, "health.ok")
+    try:
+        if (os.path.abspath(config.DATA_FOLDER) != data_folder or os.path.islink(project)
+                or os.path.islink(data_folder) or os.path.islink(marker)):
+            raise OSError("The health marker path is redirected.")
+        os.makedirs(data_folder, exist_ok=True)
+        with open(marker, "w", encoding="utf-8") as marker_file:  # PROTECTED
+            marker_file.write(str(time.time()))
+    except OSError as error:
+        logging.error("Could not write startup health marker: %s", type(error).__name__)
 
 
 def log_action(command, result):
@@ -291,6 +363,7 @@ def run():
         mode = "typed"
     if getattr(config, "USE_IRIS", False):
         return run_iris(mode)
+    _write_health_marker()  # PROTECTED
     speak_replies = mode in {"voice", "both"}
     print("Mini Jarvis is ready. Type 'exit' or 'quit' to stop.")
     try:

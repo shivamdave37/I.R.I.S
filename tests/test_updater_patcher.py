@@ -49,9 +49,9 @@ class PatcherTests(unittest.TestCase):
         """Invalid Python and altered protected lines are refused before tests."""
         result = self.proposal("def broken(:\n pass\n")
         self.assertEqual(result.status, "REFUSED")
-        protected = "def keep():\n    return True  # PROTECTED\n"
+        protected = "def keep():\n    answer = True\n    return answer  # PROTECTED\n"
         with patch.object(patcher, "_read_original", return_value=protected):
-            result = self.proposal("def keep():\n    return False  # PROTECTED\n")
+            result = self.proposal("def keep():\n    answer = False\n    return answer  # PROTECTED\n")
         self.assertEqual(result.status, "REFUSED")
 
     def test_refuses_each_banned_pattern(self):
