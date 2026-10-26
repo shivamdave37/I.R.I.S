@@ -5,7 +5,7 @@ import os
 MODE = "both"
 AI_PROVIDER = "gemini"
 AI_FALLBACK_PROVIDER = None
-USE_IRIS = False
+USE_IRIS = True
 GEMINI_MODEL = "gemini-3.5-flash-lite"
 OLLAMA_MODEL = "gemma3:1b"
 OLLAMA_URL = "http://localhost:11434/api/chat"
