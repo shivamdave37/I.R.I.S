@@ -281,5 +281,6 @@ Every request, reason shown, my answer, grant, revoke, and admin command is writ
 - Section 12 says "Iris never changes her own existing code". Stage 7 replaces that with a controlled exception: Iris may PROPOSE patches to TIER 1 files only, and a patch is applied only after every check in STAGE_7.md passes AND the admin types approval for that exact patch.
 - TIER 0 (Iris may NEVER modify, create, or delete): confirm.py, config.py, launcher.py, everything in updater/, everything in tests/, requirements.txt, .gitignore, .env and .env.example, SPEC.md, AGENTS.md, HANDOFF.md, everything in stages/, data/backups/.
 - TIER 1 (Iris may propose patches to existing files, never new or deleted files): iris/*.py (including the three agents), router.py, main.py, ai.py, voice.py, and skills/*.py (not skills/learned/).
+- Updater-only backup exception: the fixed apply/rollback workflow may create, restore, and clean backups under data/backups/. Patch proposals must always refuse data/backups/ as TIER 0.
 - Any line marked with the comment # PROTECTED can never be changed or removed by a patch.
 - Iris never applies a patch on her own, never approves her own patch, and never restarts herself without the admin's typed yes.

@@ -12,7 +12,7 @@ Used by: **Codex = BUILDER**, **Antigravity = REVIEWER**. Read only the section 
 ```
 ## 13. Stage 7 amendments (apply ONLY when building or reviewing Stage 7)
 - Section 12 says "Iris never changes her own existing code". Stage 7 replaces that with a controlled exception: Iris may PROPOSE patches to TIER 1 files only, and a patch is applied only after every check in STAGE\\\_7.md passes AND the admin types approval for that exact patch.
-- TIER 0 (Iris may NEVER modify, create, or delete): confirm.py, config.py, launcher.py, everything in updater/, everything in tests/, requirements.txt, .gitignore, .env and .env.example, SPEC.md, AGENTS.md, HANDOFF.md, everything in stages/, data/backups/.
+- TIER 0 (Iris may NEVER modify, create, or delete through a patch): confirm.py, config.py, launcher.py, everything in updater/, everything in tests/, requirements.txt, .gitignore, .env and .env.example, SPEC.md, AGENTS.md, HANDOFF.md, everything in stages/, data/backups/. The fixed apply/rollback workflow alone may create, restore, and clean backups under data/backups/; patch proposals must always refuse that path.
 - TIER 1 (Iris may propose patches to existing files, never new or deleted files): iris/\\\*.py (including the three agents), router.py, main.py, ai.py, voice.py, and skills/\\\*.py (not skills/learned/).
 - Any line marked with the comment # PROTECTED can never be changed or removed by a patch.
 - Iris never applies a patch on her own, never approves her own patch, and never restarts herself without the admin's typed yes.
