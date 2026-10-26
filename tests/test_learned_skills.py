@@ -53,6 +53,15 @@ class LearnedSkillCheckerTests(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertFalse(learned_skills.check_code(source)[0])
 
+    def test_rejects_type_as_runtime_class_factory(self):
+        """Block type() which can create classes at runtime without a ClassDef node."""
+        # Simple type() call
+        simple = GOOD_CODE.replace('return "heads"', 'return str(type(command))')
+        self.assertFalse(learned_skills.check_code(simple)[0])
+        # 3-arg type() factory bypasses the ClassDef AST check without this block
+        factory = GOOD_CODE.replace('return "heads"', 'C = type("Evil", (), {})\n    return str(C)')
+        self.assertFalse(learned_skills.check_code(factory)[0])
+
     def test_rejects_private_attributes_and_dunder_access(self):
         """Block attribute-based escapes such as __class__ and random internals."""
         for expression in ("command.__class__", "__builtins__.__dict__", "random._os"):

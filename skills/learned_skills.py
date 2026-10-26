@@ -17,7 +17,7 @@ from iris.resources import KNOWN_RESOURCES
 
 
 _ALLOWED_IMPORTS = {"datetime", "time", "math", "random", "re", "json", "statistics", "platform", "psutil"}
-_BLOCKED_NAMES = {"exec", "eval", "compile", "__import__", "open", "input", "getattr", "setattr", "delattr", "globals", "locals", "vars", "breakpoint"}
+_BLOCKED_NAMES = {"exec", "eval", "compile", "__import__", "open", "input", "getattr", "setattr", "delattr", "globals", "locals", "vars", "breakpoint", "type"}
 _LOCK = threading.Lock()
 _REQUIRED_NAMES = {"SKILL_NAME", "KEYWORDS", "RESOURCES", "run"}
 _REGISTRY_NAME = "learned_skills.json"
