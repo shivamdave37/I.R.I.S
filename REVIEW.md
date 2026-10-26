@@ -171,3 +171,16 @@ Install packages into the project virtual environment with `python -m pip instal
 - The test process is not a true Windows sandbox: it runs as the current Windows user. The static checker, narrow imports, typed resource permissions, two typed approvals, and reading the full candidate are still required.
 - Full suite using the project virtual environment: **126 tests passed**. Tests mock AI and Git and use a safe slow fixture for timeout termination; they do not verify a real AI response or human approval session.
 - Human checks still needed: read a harmless AI-generated skill, approve both gates, inspect the local commit, run its keyword, undo it, and confirm there was no push. Wake word, real apps, microphone/speaker, AI providers, and GitHub login also remain manual.
+
+### Stage 6 reviewer findings (Antigravity)
+
+- **Bug fixed:** `type` was not in `_BLOCKED_NAMES` in [`skills/learned_skills.py`](file:///c:/Users/shiva/OneDrive/Desktop/I.R.I.S/skills/learned_skills.py). The 3-argument form `type("Name", (base,), {})` creates a new class at runtime without a `ClassDef` AST node, bypassing the existing class-definition check. Added `"type"` to `_BLOCKED_NAMES`. Added `test_rejects_type_as_runtime_class_factory` to cover both `type()` introspection and the 3-arg class factory form.
+- **Checker verified against all bypass attempts from STAGE_6.md §3:** aliased imports, `from x import *`, nested functions, lambdas, decorators, dunder access, private attributes, `while True` without break, `__builtins__` via Name, class definitions — all blocked. `f-string !r/!s` and walrus `:=` are allowed (low risk, no path to harmful behavior).
+- **Verified:** `commit_learned_skill` has no `_run_git(["push", ...])` call — no push ever occurs.
+- **Verified:** `_subprocess_test` uses `[sys.executable, "-I", ...]` (isolated mode, no user site packages, no project modules available).
+- **Verified:** `_approval` checks `input_broker.enabled` — voice cannot satisfy a skill approval prompt.
+- **Verified:** `LEARNED_SKILLS` and `USER_CONFIG_FILE` are in `SENSITIVE_RESOURCES` — typed confirmation required every time.
+- **Verified:** All SPEC §5 hard limits hold — no `shell=True`, no AI-generated command execution, no push, file writes confined to `data/`, `proposed_skills/`, `skills/learned/`.
+- **Verified:** `WAKE_ENABLED = False` by default; Vosk fallback is labeled "online fallback" in output.
+- **Verified:** All 127 tests pass. Tag: `stage-6-reviewed`.
+- **Note on checker completeness:** The checker is not a true sandbox (documented in README.md and SPEC §12). The allowlist, blocked names, AST rules, human approvals, and subprocess `-I` flag together provide the protection. `f-string` format specs and walrus are within the acceptable surface area.
