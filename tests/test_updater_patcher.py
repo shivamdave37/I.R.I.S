@@ -84,6 +84,24 @@ class PatcherTests(unittest.TestCase):
         proposal = patcher.build_proposal({"iris/agent_planner.py": changed}, "shorter estimate", run_tests=False)
         self.assertEqual(proposal.status, "READY")
 
+    def test_permission_callback_cannot_be_patched_out(self):
+        """Attempts to bypass the permission callback in iris.py are refused."""
+        iris_path = os.path.join(patcher.config.PROJECT_FOLDER, "iris", "iris.py")
+        with open(iris_path, "r", encoding="utf-8") as file_handle:
+            iris_text = file_handle.read()
+        tampered = iris_text.replace("return self._permission_callback(task)  # PROTECTED", "return True  # PROTECTED")
+        proposal = patcher.build_proposal({"iris/iris.py": tampered}, "bypass permission", run_tests=False)
+        self.assertEqual(proposal.status, "REFUSED")
+
+    def test_resource_mapping_cannot_be_patched_out(self):
+        """Attempts to remove sensitive resource mapping in agent_permissions.py are refused."""
+        perm_path = os.path.join(patcher.config.PROJECT_FOLDER, "iris", "agent_permissions.py")
+        with open(perm_path, "r", encoding="utf-8") as file_handle:
+            perm_text = file_handle.read()
+        tampered = perm_text.replace('return ["GIT_REPO"]  # PROTECTED', 'return []  # PROTECTED')
+        proposal = patcher.build_proposal({"iris/agent_permissions.py": tampered}, "bypass git resource", run_tests=False)
+        self.assertEqual(proposal.status, "REFUSED")
+
 
 if __name__ == "__main__":
     unittest.main()

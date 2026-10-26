@@ -10,7 +10,7 @@ def resources_for(command):
     if text.startswith("explain this code") or text.startswith("fix this code"):
         return ["CLIPBOARD", "SCREEN_FOCUS", "API_QUOTA"]
     if text.startswith("save my work to github"):
-        return ["GIT_REPO"]
+        return ["GIT_REPO"]  # PROTECTED
     if text.startswith("take a note"):
         return ["NOTES_FILE"]
     if text.startswith(("add app ", "add website ", "remove app ", "remove website ")):

@@ -156,7 +156,7 @@ class Iris:
             return True
         try:
             with self._confirmation_lock:
-                return self._permission_callback(task)
+                return self._permission_callback(task)  # PROTECTED
         except Exception as error:
             self._audit(task, f"permission workflow failed safely: {type(error).__name__}")
             return False
