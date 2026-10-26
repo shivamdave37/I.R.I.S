@@ -1,6 +1,7 @@
 """AI chat through the configured Gemini or Ollama provider."""
 
 import os
+import threading
 
 import requests
 from dotenv import load_dotenv
@@ -11,9 +12,16 @@ import config
 
 SYSTEM_PROMPT = "You are a helpful, concise assistant. Reply in 2 to 3 sentences unless asked for detail."
 CHAT_HISTORY = []
+ASK_AI_LOCK = threading.RLock()
 
 
 def ask_ai(messages):
+    """Serialize AI requests so updater prompts cannot mix with chat history."""
+    with ASK_AI_LOCK:  # PROTECTED
+        return _ask_ai_locked(messages)
+
+
+def _ask_ai_locked(messages):
     """Answer the latest user text and keep only the last ten chat messages."""
     global CHAT_HISTORY
 
@@ -34,7 +42,7 @@ def ask_ai(messages):
     # Refuse to transmit the configured key if it was pasted into the chat by mistake.
     load_dotenv()
     configured_key = os.getenv("GEMINI_API_KEY")
-    if configured_key and configured_key in user_text:
+    if configured_key and configured_key in user_text:  # PROTECTED
         return "I can't send a message containing the configured Gemini API key."
 
     # Append to working history; will be rolled back if the provider call fails.

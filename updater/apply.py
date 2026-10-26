@@ -177,6 +177,7 @@ def apply_approved(approval, supervisor=None):
         if not committed:
             raise RuntimeError(message)
         proposal.status = "APPLIED_PENDING_RESTART"
+        proposal.applied_at = time.time()
         try:
             proposal_store.save_proposal(proposal)
         except (OSError, ValueError):
@@ -199,8 +200,7 @@ def rollback_last(ask=ask_choice):
     proposals = [item for item in proposal_store.load_proposals() if item.status == "APPLIED_PENDING_RESTART"]
     if not proposals:
         return "There is no applied update available to roll back."
-    backups = _data_path("backups")
-    proposal = max(proposals, key=lambda item: os.path.getmtime(os.path.join(backups, item.id)))
+    proposal = max(proposals, key=lambda item: item.applied_at)
     print("This restores the exact backup for update " + proposal.id + ".")
     if ask("Type yes to restore this update", {"yes"}) != "yes":
         return "Rollback cancelled; no files changed."

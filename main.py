@@ -1,5 +1,6 @@
 """Run the typed Mini Jarvis command loop."""
 
+import json
 import logging
 import os
 import sys
@@ -16,7 +17,7 @@ def _is_admin_command(command):
     """Recognize only the explicit Iris control-channel commands."""
     words = command.lower().split()
     normalized = command.lower().strip()
-    return (normalized in {"status", "grants", "stop all", "updates", "rollback last update", "restart"}
+    return (normalized in {"status", "grants", "stop all", "updates", "rollback last update", "restart", "why", "prepare it", "ignore"}  # PROTECTED
             or normalized.startswith("show update ")
             or any(normalized.startswith(action + " ") for action in ("pause", "resume", "cancel", "revoke", "priority", "switch to")))
 
@@ -26,11 +27,11 @@ def _update_prompt(question, choices):
     answer = read_console_line(question + "\nChoice: ")  # PROTECTED
     if answer is None:
         return None
-    answer = answer.strip().lower()
-    if choices and answer not in choices:  # PROTECTED
+    answer = answer.strip()
+    if choices and answer.lower() not in choices:  # PROTECTED
         print("That choice was not accepted.")
         return None
-    return answer
+    return answer.lower() if choices else answer
 
 
 def _handle_update_command(command, supervisor):
@@ -44,7 +45,21 @@ def _handle_update_command(command, supervisor):
         return "Update proposals:\n" + "\n".join(f"{item.id} {item.status}: {item.reason}" for item in proposals)
     if normalized.startswith("show update "):
         identifier = command.strip().split()[-1]
-        approval, result = updater_apply.review_proposal(identifier, supervisor=supervisor, ask=_update_prompt)  # PROTECTED
+        def revise(proposal, instruction):
+            """Prepare a bounded replacement proposal and show its evidence."""
+            from updater.triggers import prepare_proposal
+            target = next(iter(proposal.files))
+            revised, message = prepare_proposal(target, instruction, requested_by=proposal.requested_by,
+                                                revisions=proposal.revisions + 1)
+            if revised is not None:
+                print("AI wrote this reason: " + revised.reason.removeprefix("AI wrote this reason: "))
+                print("Diff:\n" + revised.diff)
+                print("Risk summary: " + json.dumps(revised.risk_summary, sort_keys=True))
+                print("Test: " + revised.test_result.get("result", "not available"))
+            return None, message
+
+        approval, result = updater_apply.review_proposal(identifier, supervisor=supervisor,
+                                                         revise_callback=revise, ask=_update_prompt)  # PROTECTED
         if approval is None:
             return result
         applied, message = updater_apply.apply_approved(approval, supervisor=supervisor)  # PROTECTED
@@ -125,6 +140,10 @@ def _iris_result(task, speak_replies):
         # Explain already speaks its own short summary; fixes must stay display-only.
         voice.speak(task.result)
         voice.wait_until_done()
+    from updater.triggers import observe_task
+    suggestion = observe_task(task)
+    if suggestion:
+        print(suggestion)
 
 
 def run_iris(mode):
@@ -171,7 +190,11 @@ def run_iris(mode):
                 if answer is None:
                     continue
                 if _is_admin_command(answer):  # PROTECTED
-                    if (answer.strip().lower() in {"updates", "rollback last update", "restart"}
+                    from updater.triggers import handle_command as handle_update_trigger
+                    handled, update_reply = handle_update_trigger(answer, typed=True)
+                    if handled:
+                        print(update_reply)
+                    elif (answer.strip().lower() in {"updates", "rollback last update", "restart"}
                             or answer.strip().lower().startswith("show update ")):
                         print(_handle_update_command(answer, supervisor))
                     else:
@@ -252,11 +275,20 @@ def run_iris(mode):
                 break
             normalized = router.normalize(command)
             if _is_admin_command(normalized):  # PROTECTED
-                if (normalized in {"updates", "rollback last update", "restart"}
+                from updater.triggers import handle_command as handle_update_trigger
+                handled, update_reply = handle_update_trigger(command, typed=typed_command)
+                if handled:
+                    print(update_reply)
+                elif (normalized in {"updates", "rollback last update", "restart"}
                         or normalized.startswith("show update ")):
                     print(_handle_update_command(command, supervisor))
                 else:
                     print(supervisor.handle_admin(normalized))
+                continue
+            from updater.triggers import handle_command as handle_update_trigger
+            handled, update_reply = handle_update_trigger(command, typed=typed_command)
+            if handled:
+                print("Iris: " + update_reply)
                 continue
             # Runtime requests cannot alter config.py or the safety limits.
             if _is_rules_change(normalized):

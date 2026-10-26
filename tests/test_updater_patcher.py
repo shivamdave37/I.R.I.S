@@ -75,6 +75,15 @@ class PatcherTests(unittest.TestCase):
             result = self.proposal("value = 2\n", run_tests=True)
         self.assertEqual(result.status, "TEST_FAILED")
 
+    def test_planner_helper_can_change_while_ai_validator_stays_protected(self):
+        """Planner behavior helpers remain patchable without changing the AI gate."""
+        planner_path = os.path.join(patcher.config.PROJECT_FOLDER, "iris", "agent_planner.py")
+        with open(planner_path, "r", encoding="utf-8") as file_handle:
+            planner_text = file_handle.read()
+        changed = planner_text.replace('"estimate_seconds": 2}', '"estimate_seconds": 1}', 1)
+        proposal = patcher.build_proposal({"iris/agent_planner.py": changed}, "shorter estimate", run_tests=False)
+        self.assertEqual(proposal.status, "READY")
+
 
 if __name__ == "__main__":
     unittest.main()

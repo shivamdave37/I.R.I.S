@@ -100,6 +100,30 @@ class ApplyTests(unittest.TestCase):
         with open(self.target, "rb") as original:
             self.assertEqual(original.read(), b"print('original')\r\n")
 
+    def test_revisions_are_limited_to_three(self):
+        """A proposal at revision three cannot request another revision."""
+        self.proposal.revisions = 3
+        with patch.object(updater_apply.proposal_store, "find_proposal", return_value=self.proposal), \
+                patch.object(updater_apply, "_base_files_match", return_value=True):
+            approval, result = updater_apply.review_proposal(
+                self.proposal.id, revise_callback=lambda proposal, instruction: self.fail("callback must not run"),
+                ask=lambda question, choices: "5")
+        self.assertIsNone(approval)
+        self.assertIn("three-revision limit", result)
+
+    def test_revision_callback_receives_typed_instruction(self):
+        """A permitted revision forwards only the typed instruction and proposal."""
+        self.proposal.revisions = 2
+        answers = iter(("5", "make the explanation shorter"))
+        with patch.object(updater_apply.proposal_store, "find_proposal", return_value=self.proposal), \
+                patch.object(updater_apply, "_base_files_match", return_value=True):
+            approval, result = updater_apply.review_proposal(
+                self.proposal.id,
+                revise_callback=lambda proposal, instruction: (None, "revision started: " + instruction),
+                ask=lambda question, choices: next(answers))
+        self.assertIsNone(approval)
+        self.assertEqual(result, "revision started: make the explanation shorter")
+
 
 if __name__ == "__main__":
     unittest.main()

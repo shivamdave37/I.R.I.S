@@ -33,6 +33,16 @@ def commit_update(files, identifier, reason):
             or not isinstance(identifier, str) or not identifier.isalnum()):
         return False, "The updater commit request is invalid."
     try:
+        load_dotenv()
+        secret = os.getenv("GEMINI_API_KEY")
+        if secret:
+            for relative_path in files:
+                source_path = os.path.join(config.PROJECT_FOLDER, *relative_path.split("/"))
+                if os.path.islink(source_path) or not os.path.isfile(source_path):
+                    return False, "An approved updater file is missing or redirected."
+                with open(source_path, "r", encoding="utf-8") as source_file:
+                    if secret in source_file.read():
+                        return False, "An approved updater file contains protected text."
         staged = _run_git(["diff", "--cached", "--name-only"])
         if staged.returncode != 0 or staged.stdout.strip():  # PROTECTED
             return False, "The Git index is not empty; nothing was committed."
@@ -49,7 +59,6 @@ def commit_update(files, identifier, reason):
             _run_git(["reset", "--"] + sorted(files))
             return False, "The updater commit message is invalid."
         try:
-            from dotenv import load_dotenv
             load_dotenv()
             secret = os.getenv("GEMINI_API_KEY")
             if secret and secret in message:
@@ -61,8 +70,8 @@ def commit_update(files, identifier, reason):
         if committed.returncode != 0:
             _run_git(["reset", "--"] + sorted(files))
             return False, "The local updater commit failed."
-    except Exception:
-        return False, "The updater could not make its fixed local commit."
+    except Exception as error:
+        return False, f"The updater could not make its fixed local commit ({type(error).__name__})."
     return True, "The approved update was committed locally; nothing was pushed."
 
 

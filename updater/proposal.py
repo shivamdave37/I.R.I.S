@@ -28,6 +28,7 @@ class Proposal:
     base_hashes: dict = field(default_factory=dict)
     risk_summary: dict = field(default_factory=dict)
     test_result: dict = field(default_factory=dict)
+    applied_at: float = 0.0
 
 
 def _proposal_folder():
@@ -76,8 +77,11 @@ def load_proposals():
     for name in names:
         if not re.fullmatch(r"[a-f0-9]{12}\.json", name):
             continue
+        path = os.path.join(folder, name)
+        if os.path.islink(path):
+            continue
         try:
-            with open(os.path.join(folder, name), "r", encoding="utf-8") as proposal_file:
+            with open(path, "r", encoding="utf-8") as proposal_file:
                 stored = json.load(proposal_file)
             proposal = Proposal(**stored)
             if proposal.id + ".json" == name and isinstance(proposal.files, dict):
