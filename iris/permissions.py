@@ -10,7 +10,7 @@ import config
 from iris.console import input_broker
 
 
-SENSITIVE_RESOURCES = {"GIT_REPO", "SCREEN_FOCUS", "NOTES_FILE", "USER_CONFIG_FILE", "LEARNED_SKILLS"}
+SENSITIVE_RESOURCES = {"GIT_REPO", "SCREEN_FOCUS", "NOTES_FILE", "USER_CONFIG_FILE", "LEARNED_SKILLS"}  # PROTECTED
 
 
 class PermissionManager:
@@ -71,7 +71,7 @@ class PermissionManager:
             policy = "typed yes required every time" if resource in SENSITIVE_RESOURCES else "once/session/always/deny"
             prompt_text += f"  [{index}] {resource} - {reason} ({policy})\n"
         prompt_text += "Type one choice per item in order, separated by commas (sensitive items: type yes or deny).\nPermission choices: "
-        prompt = input_broker.create_request(prompt_text, kind="permission")
+        prompt = input_broker.create_request(prompt_text, kind="permission")  # PROTECTED
         with self._lock:
             self._pending = {"task": task, "items": reasons, "prompt_id": prompt["id"]}
         self._audit(task, "permission request shown: " + ", ".join(ask_resources))

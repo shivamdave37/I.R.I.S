@@ -26,14 +26,14 @@ def _empty_config():
 
 def _config_path():
     """Resolve the user config path and refuse paths outside project data."""
-    project_path = Path(config.PROJECT_FOLDER).resolve()
+    project_path = Path(config.PROJECT_FOLDER).resolve()  # PROTECTED
     data_candidate = Path(config.DATA_FOLDER)
     expected_data_path = project_path / "data"
-    if data_candidate.is_symlink() or data_candidate.resolve() != expected_data_path:
+    if data_candidate.is_symlink() or data_candidate.resolve() != expected_data_path:  # PROTECTED
         raise ValueError("The user config must stay in the project's data folder.")
     data_path = expected_data_path
     config_path = data_path / "user_config.json"
-    if config_path.is_symlink():
+    if config_path.is_symlink():  # PROTECTED
         raise ValueError("The user config file cannot be a symbolic link.")
     return config_path
 

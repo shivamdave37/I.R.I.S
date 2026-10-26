@@ -1,0 +1,80 @@
+"""Check the patch pipeline's fixed safety scans and diff generation."""
+
+import os
+import unittest
+from unittest.mock import patch
+
+from updater import patcher
+
+
+class PatcherTests(unittest.TestCase):
+    """Exercise refusal rules without running candidate code."""
+
+    def setUp(self):
+        """Use a tiny existing allowed project file for repeatable proposals."""
+        self.save_patch = patch.object(patcher.proposal_store, "save_proposal")
+        self.save_patch.start()
+        self.addCleanup(self.save_patch.stop)
+        self.source = os.path.join(patcher.config.PROJECT_FOLDER, "main.py")
+        with open(self.source, "r", encoding="utf-8") as file_handle:
+            self.original = file_handle.read()
+
+    def proposal(self, text, **kwargs):
+        """Build a candidate while keeping sandbox execution mocked off."""
+        kwargs.setdefault("run_tests", False)
+        return patcher.build_proposal({"main.py": text}, "small safe edit", **kwargs)
+
+    def test_diff_is_generated_from_full_text(self):
+        """The displayed diff contains the actual file change from difflib."""
+        proposal = self.proposal(self.original + "\n# harmless proposal\n")
+        self.assertIn("# harmless proposal", proposal.diff)
+        self.assertIn("main.py", proposal.diff)
+
+    def test_refuses_non_tier_one_and_missing_targets(self):
+        """Protected paths and new files never become patch proposals."""
+        result = patcher.build_proposal({"confirm.py": "x = 1\n"}, "reason", run_tests=False)
+        self.assertEqual(result.status, "REFUSED")
+        with patch.object(patcher, "_read_original", side_effect=ValueError("missing")):
+            result = self.proposal("x = 1\n")
+        self.assertEqual(result.status, "REFUSED")
+
+    def test_refuses_file_count_and_line_limits(self):
+        """The file count and total changed-line caps are enforced."""
+        many = {"main.py": self.original, "router.py": "x = 1\n", "ai.py": "x = 1\n", "voice.py": "x = 1\n"}
+        self.assertEqual(patcher.build_proposal(many, "reason", run_tests=False).status, "REFUSED")
+        result = self.proposal("\n".join("value = %d" % index for index in range(90)))
+        self.assertEqual(result.status, "REFUSED")
+
+    def test_refuses_syntax_error_and_protected_marker_change(self):
+        """Invalid Python and altered protected lines are refused before tests."""
+        result = self.proposal("def broken(:\n pass\n")
+        self.assertEqual(result.status, "REFUSED")
+        protected = "def keep():\n    return True  # PROTECTED\n"
+        with patch.object(patcher, "_read_original", return_value=protected):
+            result = self.proposal("def keep():\n    return False  # PROTECTED\n")
+        self.assertEqual(result.status, "REFUSED")
+
+    def test_refuses_each_banned_pattern(self):
+        """Every explicitly banned token in added lines blocks the proposal."""
+        examples = [
+            "shell=True", "exec(", "eval(", "__import__", "importlib", "os.system",
+            "socket", ".env", "API_KEY", "base64", "import subprocess\nsubprocess.run([])",
+            "from urllib.request import urlopen\nurlopen('https://example.com')",
+            "open('file.txt', 'w')",
+        ]
+        for snippet in examples:
+            with self.subTest(snippet=snippet):
+                with patch.object(patcher, "_read_original", return_value="value = 1\n"):
+                    result = self.proposal("value = 1\n" + snippet + "\n")
+                self.assertEqual(result.status, "REFUSED")
+
+    def test_test_failure_does_not_become_ready(self):
+        """A failed isolated test leaves the candidate unapprovable."""
+        with patch.object(patcher, "_read_original", return_value="value = 1\n"), \
+                patch.object(patcher.sandbox_test, "run_tests", return_value={"passed": False, "result": "failed"}):
+            result = self.proposal("value = 2\n", run_tests=True)
+        self.assertEqual(result.status, "TEST_FAILED")
+
+
+if __name__ == "__main__":
+    unittest.main()

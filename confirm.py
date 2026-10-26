@@ -8,7 +8,7 @@ def ask_yes_no(question, require_typed=False):
     print(f"{question} (yes/no)")
     try:
         # Sensitive actions must use the keyboard so nearby speech cannot approve them.
-        if require_typed:
+        if require_typed:  # PROTECTED
             from iris.console import request_input
             answer = request_input("You: ")
         else:

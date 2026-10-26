@@ -30,7 +30,7 @@ def create_listener():
 def _reserve_microphone(resource_manager):
     """Reserve the microphone and speaker together for one short listen."""
     task = Task(-1, "wake listener", "wake listener", needed_resources=["MIC_SPEAKER"])
-    if not resource_manager.reserve_all(task):
+    if not resource_manager.reserve_all(task):  # PROTECTED
         return None
     return task
 

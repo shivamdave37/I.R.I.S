@@ -14,17 +14,17 @@ class ResourceManager:
         self._lock = threading.Lock()
         self._owners = {}
 
-    def reserve_all(self, task):
+    def reserve_all(self, task):  # PROTECTED
         """Reserve every known free resource, or reserve none of them."""
-        resources = sorted(set(task.needed_resources))
-        if any(resource not in KNOWN_RESOURCES for resource in resources):
+        resources = sorted(set(task.needed_resources))  # PROTECTED
+        if any(resource not in KNOWN_RESOURCES for resource in resources):  # PROTECTED
             return False
         # One lock covers both the availability check and every assignment.
-        with self._lock:
-            if any(resource in self._owners and self._owners[resource] != task.id for resource in resources):
+        with self._lock:  # PROTECTED
+            if any(resource in self._owners and self._owners[resource] != task.id for resource in resources):  # PROTECTED
                 return False
             for resource in resources:
-                self._owners[resource] = task.id
+                self._owners[resource] = task.id  # PROTECTED
             return True
 
     def release(self, task):

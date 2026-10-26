@@ -28,7 +28,7 @@ class Iris:
         self._queue = []
         self._counter = itertools.count(1)
         self._condition = threading.Condition()
-        self.stop_event = threading.Event()
+        self.stop_event = threading.Event()  # PROTECTED
         self._permission_callback = permission_callback
         self._result_callback = result_callback
         self._task_timeout = task_timeout
@@ -55,7 +55,7 @@ class Iris:
 
     def submit(self, command, priority=10, name=None):
         """Plan and enqueue one command, returning its task record."""
-        if self.stop_event.is_set():
+        if self.stop_event.is_set():  # PROTECTED
             raise RuntimeError("Iris is stopped")
         task_id = next(self._counter)
         task_name = self._safe_task_name(name or command.strip() or "empty command")
@@ -95,10 +95,10 @@ class Iris:
 
     def _schedule_loop(self):
         """Start the highest-priority ready task whenever its resources are free."""
-        while not self.stop_event.is_set():
+        while not self.stop_event.is_set():  # PROTECTED
             with self._condition:
-                self._condition.wait_for(lambda: self.stop_event.is_set() or self._queue, timeout=0.2)
-                if self.stop_event.is_set():
+                self._condition.wait_for(lambda: self.stop_event.is_set() or self._queue, timeout=0.2)  # PROTECTED
+                if self.stop_event.is_set():  # PROTECTED
                     break
                 # One active task keeps every stdin confirmation in the single prompt queue.
                 if any(task.state == TaskState.RUNNING for task in self.tasks.values()):
@@ -137,7 +137,7 @@ class Iris:
                     chosen.authorized_at = time.monotonic()
                 if chosen.state == TaskState.CANCELLED or chosen.cancel_event.is_set():
                     continue
-                if self.resources.reserve_all(chosen):
+                if self.resources.reserve_all(chosen):  # PROTECTED
                     self._start_worker(chosen)
                 else:
                     chosen.state = TaskState.WAITING
@@ -187,7 +187,7 @@ class Iris:
         """Run a task with exception handling and unconditional resource cleanup."""
         try:
             task.result = agent_executor.execute(task, self)
-            if task.cancel_event.is_set() or self.stop_event.is_set() or task.result == "cancelled":
+            if task.cancel_event.is_set() or self.stop_event.is_set() or task.result == "cancelled":  # PROTECTED
                 task.state = TaskState.CANCELLED
             elif task.pause_event.is_set():
                 task.state = TaskState.PAUSED
@@ -215,7 +215,7 @@ class Iris:
 
     def _watchdog_loop(self):
         """Cancel overdue tasks and free their reservations."""
-        while not self.stop_event.wait(0.1):
+        while not self.stop_event.wait(0.1):  # PROTECTED
             now = time.monotonic()
             for task in list(self.tasks.values()):
                 if (task.state == TaskState.QUEUED and not task.permission_waiting
@@ -277,7 +277,7 @@ class Iris:
         task = self.tasks.get(task_id)
         if task is None or task.state != TaskState.PAUSED:
             return "Task is not paused."
-        if not self.resources.reserve_all(task):
+        if not self.resources.reserve_all(task):  # PROTECTED
             return "Task is waiting for its resources."
         task.cancel_event.clear()
         task.pause_event.clear()
@@ -309,14 +309,14 @@ class Iris:
     def pause_checkpoint(self, task):
         """Release resources while paused and wait cooperatively for resume or cancel."""
         if not task.pause_event.is_set():
-            return not task.cancel_event.is_set() and not self.stop_event.is_set()
+            return not task.cancel_event.is_set() and not self.stop_event.is_set()  # PROTECTED
         self.resources.release(task)
         task.state = TaskState.PAUSED
         self._audit(task, f"paused at step {task.current_step}")
-        while task.pause_event.is_set() and not task.cancel_event.is_set() and not self.stop_event.is_set():
+        while task.pause_event.is_set() and not task.cancel_event.is_set() and not self.stop_event.is_set():  # PROTECTED
             # The short wait lets an admin resume or stop the worker without busy looping.
             task.cancel_event.wait(0.05)
-        return not task.cancel_event.is_set() and not self.stop_event.is_set()
+        return not task.cancel_event.is_set() and not self.stop_event.is_set()  # PROTECTED
 
     def set_priority(self, task_id, priority):
         """Update a queued task's priority without changing the global rules."""
@@ -409,7 +409,7 @@ class Iris:
 
     def stop(self, timeout=3):
         """Signal all workers to stop and join them within a bounded time."""
-        self.stop_event.set()
+        self.stop_event.set()  # PROTECTED
         from iris.console import input_broker
         input_broker.cancel_all()
         for task in self.tasks.values():

@@ -47,19 +47,19 @@ def _locations():
 
 def _safe_path(path, allowed_roots):
     """Accept a path only when it resolves inside one of the approved roots."""
-    absolute = os.path.abspath(path)
+    absolute = os.path.abspath(path)  # PROTECTED
     resolved = os.path.realpath(absolute)
     for root in allowed_roots:
-        if os.path.islink(root):
+        if os.path.islink(root):  # PROTECTED
             return False
         root_real = os.path.realpath(root)
-        if resolved == root_real or resolved.startswith(root_real + os.sep):
+        if resolved == root_real or resolved.startswith(root_real + os.sep):  # PROTECTED
             current = root_real
             remainder = os.path.relpath(absolute, root_real)
             if remainder != ".":
                 for part in remainder.split(os.sep):
                     current = os.path.join(current, part)
-                    if os.path.islink(current):
+                    if os.path.islink(current):  # PROTECTED
                         return False
             return True
     logging.warning("Refused learned-skill path outside approved folders")
@@ -354,7 +354,7 @@ def add_skill(description, expected_name=None):
     print("Proposed skill code:\n" + code)
     print("RESOURCES: " + (", ".join(metadata["resources"]) or "none"))
     print("Checker: " + checker_result)
-    if not _typed_no_or_yes("Read the complete code. Allow the isolated 5-second test?", baseline):
+    if not _typed_no_or_yes("Read the complete code. Allow the isolated 5-second test?", baseline):  # PROTECTED
         return "No skill was installed."
     os.makedirs(proposal_folder, exist_ok=True)
     if not _safe_path(proposal_path, [proposal_folder]):
@@ -367,7 +367,7 @@ def add_skill(description, expected_name=None):
         if os.path.isfile(proposal_path) and _safe_path(proposal_path, [proposal_folder]):
             os.remove(proposal_path)
         return "The skill test failed. No skill was installed."
-    if not _typed_no_or_yes("Review the test result. Install and locally commit this skill?", baseline):
+    if not _typed_no_or_yes("Review the test result. Install and locally commit this skill?", baseline):  # PROTECTED
         if os.path.isfile(proposal_path) and _safe_path(proposal_path, [proposal_folder]):
             os.remove(proposal_path)
         return "No skill was installed."

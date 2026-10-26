@@ -39,7 +39,7 @@ def save_to_github():
     if not changed_files:
         return "There are no project changes to save."
     print("Project changes:\n" + changed_files)
-    if not ask_yes_no("Do you want to stage these project changes?", require_typed=True):
+    if not ask_yes_no("Do you want to stage these project changes?", require_typed=True):  # PROTECTED
         return "I didn't stage or push anything."
 
     try:
@@ -62,7 +62,7 @@ def save_to_github():
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
     if api_key and api_key in message:
         return "I can't use a commit message that contains the configured Gemini API key."
-    if not ask_yes_no(f"Commit the staged changes with this message: {message}?", require_typed=True):
+    if not ask_yes_no(f"Commit the staged changes with this message: {message}?", require_typed=True):  # PROTECTED
         return "The changes remain staged; I didn't commit or push them."
     try:
         commit_result = _run_git(["commit", "-m", message])
@@ -71,7 +71,7 @@ def save_to_github():
     if commit_result.returncode != 0:
         return f"Git commit failed with exit code {commit_result.returncode}. The changes may still be staged."
 
-    if not ask_yes_no("Do you want to push this commit to GitHub?", require_typed=True):
+    if not ask_yes_no("Do you want to push this commit to GitHub?", require_typed=True):  # PROTECTED
         return "The commit is saved locally; I didn't push it."
     try:
         push_result = _run_git(["push"])

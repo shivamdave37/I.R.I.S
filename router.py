@@ -45,9 +45,9 @@ def handle(command):
     # Handle website and app opening commands starting with 'open '.
     if normalized.startswith("open "):
         name = normalized[5:].strip()
-        if name in web.available_websites():
+        if name in web.available_websites():  # PROTECTED
             return web.open_website(name)
-        if name in apps.available_apps():
+        if name in apps.available_apps():  # PROTECTED
             return apps.open_app(name)
         return f"I can't open {name}; it is not on the approved list."
 

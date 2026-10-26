@@ -5,7 +5,7 @@ def execute(task, iris):
     """Run the safe router step while honoring pause and cancel between steps."""
     import router
     while task.current_step < len(task.plan):
-        if task.cancel_event.is_set() or iris.stop_event.is_set():
+        if task.cancel_event.is_set() or iris.stop_event.is_set():  # PROTECTED
             return "cancelled"
         if not iris.pause_checkpoint(task):
             return "cancelled"
