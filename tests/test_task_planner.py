@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import config
+import action_gateway
 import skills
 import task_planner
 
@@ -76,13 +77,14 @@ class PlanExecutionTests(unittest.TestCase):
         time_skill.assert_called_once_with()
         note_skill.assert_called_once_with("to study Python tomorrow.")
 
-    def test_denial_prevents_every_step(self):
-        """Approvals are collected before any side effect begins."""
+    def test_denial_prevents_the_associated_action(self):
+        """A denied action does not run, even after an earlier approved step."""
         output = io.StringIO()
         with patch("skills.open_approved") as opener, patch("skills.add_note") as save_note, redirect_stdout(output):
-            reply = task_planner.handle("open YouTube and note buy milk", lambda prompt: "no")
-        self.assertIn("Cancelled", reply)
-        opener.assert_not_called()
+            answers = iter(["yes", "no"])
+            reply = task_planner.handle("open YouTube and note buy milk", lambda prompt: next(answers))
+        self.assertIn("remaining steps were not run", reply)
+        opener.assert_called_once_with("youtube")
         save_note.assert_not_called()
 
     def test_approved_delete_reaches_guarded_note_function(self):
@@ -140,19 +142,19 @@ class NoteSearchDeleteTests(unittest.TestCase):
         """Search is case-insensitive and deletion changes only the chosen note."""
         with tempfile.TemporaryDirectory(dir=config.PROJECT_FOLDER) as directory:
             with patch.object(config, "DATA_FOLDER", Path(directory)):
-                skills.add_note("Study Python tomorrow")
-                skills.add_note("Buy milk")
+                action_gateway.execute("save_note", {"text": "Study Python tomorrow"}, lambda prompt: "yes")
+                action_gateway.execute("save_note", {"text": "Buy milk"}, lambda prompt: "yes")
                 self.assertEqual(skills.search_notes("PYTHON"), "1. Study Python tomorrow")
                 self.assertIn("confirmation", skills.delete_note(1).lower())
-                self.assertEqual(skills.delete_note(1, approved=True), "Deleted note 1: Study Python tomorrow")
+                self.assertEqual(action_gateway.execute("delete_note", {"index": 1}, lambda prompt: "yes"), "Deleted note 1: Study Python tomorrow")
                 self.assertEqual(skills.show_notes(), "1. Buy milk")
 
     def test_invalid_delete_index_preserves_notes(self):
         """A missing selection cannot delete or rewrite the note list."""
         with tempfile.TemporaryDirectory(dir=config.PROJECT_FOLDER) as directory:
             with patch.object(config, "DATA_FOLDER", Path(directory)):
-                skills.add_note("keep me")
-                self.assertIn("does not exist", skills.delete_note(2, approved=True))
+                action_gateway.execute("save_note", {"text": "keep me"}, lambda prompt: "yes")
+                self.assertIn("does not exist", action_gateway.execute("delete_note", {"index": 2}, lambda prompt: "yes"))
                 self.assertEqual(skills.show_notes(), "1. keep me")
 
 

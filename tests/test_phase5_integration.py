@@ -65,7 +65,8 @@ class PhaseFiveIntegrationTests(unittest.TestCase):
                     lambda prompt: "no",
                 )
                 search_reply = skills.search_notes(marker)
-            self.assertIn("open_target [denied]", reply)
+            self.assertIn("Approval denied", reply)
+            self.assertIn("[denied]", reply)
             self.assertIn("save_note [skipped]", reply)
             self.assertIn("Cancelled; no steps were run.", reply)
             self.assertEqual(search_reply, "No matching notes.")

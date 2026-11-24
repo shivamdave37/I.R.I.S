@@ -59,13 +59,13 @@ class RouterTests(unittest.TestCase):
         opener.assert_called_once_with("youtube")
         tell_time.assert_called_once_with()
 
-    def test_denial_cancels_all_steps_before_side_effects(self):
-        """A later declined permission prevents every step from starting."""
+    def test_later_denial_does_not_authorize_that_action(self):
+        """Each action gets immediate approval; a declined later action never runs."""
         answers = iter(["yes", "no"])
         with patch("router.skills.open_approved") as opener, patch("router.skills.add_note") as save_note:
             reply = router.handle("open YouTube and note buy milk", lambda prompt: next(answers))
-        self.assertIn("no steps were run", reply)
-        opener.assert_not_called()
+        self.assertIn("remaining steps were not run", reply)
+        opener.assert_called_once_with("youtube")
         save_note.assert_not_called()
 
     def test_and_inside_note_is_preserved_as_note_text(self):

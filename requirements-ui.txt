@@ -1,0 +1,4 @@
+# Optional Windows-only screen capture and accessible UI control.
+# The terminal and all non-GUI Iris features work without these packages.
+PyAutoGUI>=0.9.54
+pywinauto>=0.6.8

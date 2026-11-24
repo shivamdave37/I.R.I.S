@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import config
+import action_gateway
 import skill_development
 
 
@@ -58,7 +59,7 @@ class ProposalWorkflowTests(unittest.TestCase):
         def exercise(folder):
             output = StringIO()
             with patch("skill_development.ai.generate_skill_proposal", return_value=VALID_SOURCE), redirect_stdout(output):
-                result = skill_development.create_proposal("greeting", "Return a short greeting", lambda prompt: "yes")
+                result = action_gateway.execute("create_skill_proposal", {"name": "greeting", "purpose": "Return a short greeting"}, lambda prompt: "yes")
             self.assertIn("not active", result)
             self.assertIn("NOT RUN", output.getvalue())
             self.assertIn("def skill_greeting", output.getvalue())
@@ -71,8 +72,9 @@ class ProposalWorkflowTests(unittest.TestCase):
         """Declining the post-preview approval prevents proposal persistence."""
         def exercise(folder):
             with patch("skill_development.ai.generate_skill_proposal", return_value=VALID_SOURCE), redirect_stdout(StringIO()):
-                result = skill_development.create_proposal("greeting", "Return a short greeting", lambda prompt: "no")
-            self.assertIn("denied", result.lower())
+                answers = iter(["yes", "no"])
+                with self.assertRaises(action_gateway.ApprovalDenied):
+                    action_gateway.execute("create_skill_proposal", {"name": "greeting", "purpose": "Return a short greeting"}, lambda prompt: next(answers))
             self.assertFalse(folder.exists())
         self.run_with_temp_proposals(exercise)
 
@@ -81,7 +83,7 @@ class ProposalWorkflowTests(unittest.TestCase):
         unsafe = "import os\ndef skill_greeting(request):\n    \"\"\"Return a greeting.\"\"\"\n    return str(request)"
         def exercise(folder):
             with patch("skill_development.ai.generate_skill_proposal", return_value=unsafe):
-                result = skill_development.create_proposal("greeting", "Return a short greeting", lambda prompt: "yes")
+                result = action_gateway.execute("create_skill_proposal", {"name": "greeting", "purpose": "Return a short greeting"}, lambda prompt: "yes")
             self.assertIn("validation failed", result.lower())
             self.assertFalse(folder.exists())
         self.run_with_temp_proposals(exercise)
@@ -90,8 +92,8 @@ class ProposalWorkflowTests(unittest.TestCase):
         """Typed approval records intent but leaves the static registry untouched."""
         def exercise(folder):
             with patch("skill_development.ai.generate_skill_proposal", return_value=VALID_SOURCE), redirect_stdout(StringIO()):
-                skill_development.create_proposal("greeting", "Return a short greeting", lambda prompt: "yes")
-                result = skill_development.approve_for_manual_integration("greeting", 1, lambda prompt: "yes")
+                action_gateway.execute("create_skill_proposal", {"name": "greeting", "purpose": "Return a short greeting"}, lambda prompt: "yes")
+                result = action_gateway.execute("approve_skill_proposal", {"name": "greeting", "version": 1}, lambda prompt: "yes")
             self.assertIn("remains inactive", result)
             events = (folder / "events.jsonl").read_text(encoding="utf-8")
             self.assertIn("approved_for_manual_integration", events)
@@ -103,8 +105,8 @@ class ProposalWorkflowTests(unittest.TestCase):
         """A withdrawn proposal remains available as a versioned audit record."""
         def exercise(folder):
             with patch("skill_development.ai.generate_skill_proposal", return_value=VALID_SOURCE), redirect_stdout(StringIO()):
-                skill_development.create_proposal("greeting", "Return a short greeting", lambda prompt: "yes")
-                result = skill_development.withdraw_proposal("greeting", 1, lambda prompt: "yes")
+                action_gateway.execute("create_skill_proposal", {"name": "greeting", "purpose": "Return a short greeting"}, lambda prompt: "yes")
+                result = action_gateway.execute("withdraw_skill_proposal", {"name": "greeting", "version": 1}, lambda prompt: "yes")
             self.assertIn("record remains available", result)
             self.assertTrue((folder / "greeting-v001.json").is_file())
             self.assertIn("proposal_withdrawn", (folder / "events.jsonl").read_text(encoding="utf-8"))
@@ -114,7 +116,7 @@ class ProposalWorkflowTests(unittest.TestCase):
         """A saved proposal changed after validation cannot pass later review."""
         def exercise(folder):
             with patch("skill_development.ai.generate_skill_proposal", return_value=VALID_SOURCE), redirect_stdout(StringIO()):
-                skill_development.create_proposal("greeting", "Return a short greeting", lambda prompt: "yes")
+                action_gateway.execute("create_skill_proposal", {"name": "greeting", "purpose": "Return a short greeting"}, lambda prompt: "yes")
             path = folder / "greeting-v001.json"
             record = json.loads(path.read_text(encoding="utf-8"))
             record["source"] = "import os"

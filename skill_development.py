@@ -7,6 +7,7 @@ import keyword
 from pathlib import Path
 import re
 
+import approval_context
 import ai
 import config
 
@@ -94,8 +95,27 @@ def _proposal_path(name, version):
     return PROPOSALS_FOLDER / f"{name}-v{version:03d}.json"
 
 
-def _append_event(event):
-    """Append an audit event without overwriting previous proposal history."""
+def _append_event(event, action, params):
+    """Append one validated event for the matching currently approved action.
+
+    The event file is an internal audit record, not an independently exposed
+    skill. It is writable only while its corresponding proposal action is
+    executing through the gateway.
+    """
+    event_actions = {
+        "proposal_saved": "create_skill_proposal",
+        "approved_for_manual_integration": "approve_skill_proposal",
+        "proposal_withdrawn": "withdraw_skill_proposal",
+    }
+    if (not isinstance(event, dict) or set(event) != {"event", "name", "version", "time"}
+            or event.get("event") not in event_actions
+            or action != event_actions[event["event"]]
+            or event.get("name") != params.get("name")
+            or isinstance(event.get("version"), bool)
+            or not isinstance(event.get("version"), int) or event["version"] < 1
+            or not isinstance(event.get("time"), str)):
+        return False
+    approval_context.require(action, params)
     if not _safe_folder():
         return False
     try:
@@ -133,6 +153,7 @@ def _strip_code_fence(source):
 
 def create_proposal(name, purpose, input_fn=input):
     """Generate, validate, display, and optionally save an inert skill proposal."""
+    approval_context.require("create_skill_proposal", {"name": name, "purpose": purpose})
     try:
         # Validate human-supplied metadata before sending it to the configured AI.
         _validate_metadata(name, purpose)
@@ -145,15 +166,16 @@ def create_proposal(name, purpose, input_fn=input):
     print(source)
     print(checks)
     print("Runtime tests: NOT RUN; this environment has no isolated sandbox for generated code.")
-    try:
-        answer = input_fn("Type yes to save this inert proposal for human review, or anything else to cancel: ")
-    except (EOFError, KeyboardInterrupt):
-        answer = ""
-    if not isinstance(answer, str) or answer.strip().casefold() != "yes":
-        return "Proposal creation denied; nothing was saved."
+    import action_gateway
+    version = _next_version(name)
+    action_gateway.approve_reviewed_action(
+        "create_skill_proposal",
+        {"name": name, "purpose": purpose},
+        f"save this inert {name} proposal v{version} for: {purpose.strip()!r}",
+        input_fn,
+    )
 
     try:
-        version = _next_version(name)
         proposal_path = _proposal_path(name, version)
         if not _safe_folder():
             return "Proposal validation failed: proposal storage is redirected. Candidate was not saved."
@@ -171,7 +193,10 @@ def create_proposal(name, purpose, input_fn=input):
         with proposal_path.open("x", encoding="utf-8") as proposal_file:
             json.dump(record, proposal_file, ensure_ascii=False, indent=2)
             proposal_file.write("\n")
-        if not _append_event({"event": "proposal_saved", "name": name, "version": version, "time": record["created_utc"]}):
+        if not _append_event(
+            {"event": "proposal_saved", "name": name, "version": version, "time": record["created_utc"]},
+            "create_skill_proposal", {"name": name, "purpose": purpose},
+        ):
             return "Proposal validation failed: audit log could not be written. The saved draft is not active."
     except (OSError, ValueError):
         return "Proposal validation failed: the draft could not be saved safely."
@@ -196,6 +221,7 @@ def read_proposal(name, version):
 
 def approve_for_manual_integration(name, version, input_fn=input):
     """Record typed human review approval without dynamically activating code."""
+    approval_context.require("approve_skill_proposal", {"name": name, "version": version})
     record = read_proposal(name, version)
     if record is None:
         return "Proposal validation failed: no valid saved proposal was found."
@@ -203,29 +229,29 @@ def approve_for_manual_integration(name, version, input_fn=input):
     print(record["source"])
     print(record["static_checks"])
     print("Runtime tests remain NOT RUN; approval does not install or activate this code.")
-    try:
-        answer = input_fn("After reviewing this exact proposal, type yes to approve manual integration: ")
-    except (EOFError, KeyboardInterrupt):
-        answer = ""
-    if not isinstance(answer, str) or answer.strip().casefold() != "yes":
-        return "Proposal approval denied; it remains inactive."
+    import action_gateway
+    action_gateway.approve_reviewed_action(
+        "approve_skill_proposal", {"name": name, "version": version},
+        f"record manual-integration approval for the reviewed proposal {name} v{version}", input_fn,
+    )
     event = {"event": "approved_for_manual_integration", "name": name, "version": version, "time": datetime.now(timezone.utc).isoformat()}
-    if not _append_event(event):
+    if not _append_event(event, "approve_skill_proposal", {"name": name, "version": version}):
         return "Proposal validation failed: approval could not be recorded."
     return f"Approval recorded for manual integration of {name} v{version}; it remains inactive in Iris."
 
 
 def withdraw_proposal(name, version, input_fn=input):
     """Record an approved withdrawal while preserving the proposal for audit."""
-    if read_proposal(name, version) is None:
+    approval_context.require("withdraw_skill_proposal", {"name": name, "version": version})
+    record = read_proposal(name, version)
+    if record is None:
         return "Proposal validation failed: no valid saved proposal was found."
-    try:
-        answer = input_fn(f"Type yes to withdraw {name} v{version}; its record will be retained: ")
-    except (EOFError, KeyboardInterrupt):
-        answer = ""
-    if not isinstance(answer, str) or answer.strip().casefold() != "yes":
-        return "Proposal withdrawal denied; it remains unchanged."
+    import action_gateway
+    action_gateway.approve_reviewed_action(
+        "withdraw_skill_proposal", {"name": name, "version": version},
+        f"withdraw proposal {name} v{version} while retaining its record", input_fn,
+    )
     event = {"event": "proposal_withdrawn", "name": name, "version": version, "time": datetime.now(timezone.utc).isoformat()}
-    if not _append_event(event):
+    if not _append_event(event, "withdraw_skill_proposal", {"name": name, "version": version}):
         return "Proposal validation failed: withdrawal could not be recorded."
     return f"Withdrew {name} v{version}; its proposal record remains available for audit."

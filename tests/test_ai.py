@@ -57,6 +57,7 @@ class AiTests(unittest.TestCase):
     def test_missing_gemini_key_is_clear_and_does_not_call_network(self):
         """A missing key is reported before an HTTP request is attempted."""
         with patch.dict(os.environ, {"GEMINI_API_KEY": "", "IRIS_AI_PROVIDER": "gemini"}), \
+                patch("ai._load_env_file", return_value=True), \
                 patch("ai._request_json") as request:
             reply = ai.ask("hello")
         self.assertIn("not configured", reply)
