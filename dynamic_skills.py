@@ -13,6 +13,48 @@ import sandbox_runner
 TEMP_SKILLS_DIR = config.DATA_FOLDER / "temp_skills"
 REGISTRY_FILE = TEMP_SKILLS_DIR / "registry.json"
 
+STOP_WORDS = frozenset({
+    "open", "run", "start", "launch", "execute", "do", "make",
+    "the", "a", "an", "for", "to", "in", "on", "with", "app", "tool", "skill",
+    "please", "can", "you", "me", "this"
+})
+
+COMMON_APPS = {
+    "notepad": "notepad.exe",
+    "calculator": "calc.exe",
+    "calc": "calc.exe",
+    "paint": "mspaint.exe",
+    "mspaint": "mspaint.exe",
+    "cmd": "cmd.exe",
+    "terminal": "wt.exe",
+    "powershell": "powershell.exe",
+    "explorer": "explorer.exe",
+    "taskmgr": "taskmgr.exe",
+    "task manager": "taskmgr.exe",
+    "word": "winword.exe",
+    "excel": "excel.exe",
+    "powerpoint": "powerpnt.exe",
+    "spotify": "spotify.exe",
+    "vlc": "vlc.exe",
+    "discord": "discord.exe",
+    "steam": "steam.exe",
+}
+
+COMMON_SITES = {
+    "reddit": "https://www.reddit.com",
+    "twitter": "https://twitter.com",
+    "x": "https://x.com",
+    "wikipedia": "https://www.wikipedia.org",
+    "amazon": "https://www.amazon.com",
+    "netflix": "https://www.netflix.com",
+    "spotify": "https://open.spotify.com",
+    "chatgpt": "https://chatgpt.com",
+    "google": "https://www.google.com",
+    "bing": "https://www.bing.com",
+    "github": "https://github.com",
+    "youtube": "https://www.youtube.com",
+}
+
 
 BOUNDARY_RULES = [
     (
@@ -144,36 +186,51 @@ def find_matching_trial_skill(query: str, threshold: float = 0.70) -> Optional[D
 
     import difflib
 
+    # Extract distinct non-stop-word query terms
+    q_words = set(re.findall(r"[a-zA-Z0-9_-]+", q)) - STOP_WORDS
+
     for skill_id, entry in registry.items():
         name = entry.get("name", "").lower()
-        tags = [t.lower() for t in entry.get("tags", [])]
+        tags = [t.lower() for t in entry.get("tags", []) if t.lower() not in STOP_WORDS]
 
-        # 1. Exact tag or tag phrase match in query
-        if any(len(t) > 2 and t in q for t in tags):
+        # 1. Distinctive tag word matches any word in query
+        if any(t in q_words for t in tags if " " not in t):
             return entry
 
-        # 2. Direct name substring or strong ratio
-        if len(name) > 2 and (name in q or difflib.SequenceMatcher(None, q, name).ratio() >= threshold):
+        # 2. Multi-word tag phrase is in query
+        if any(len(t) > 3 and t in q for t in tags if " " in t):
             return entry
+
+        # 3. Direct name match (e.g. 'open_edge' in query, or 'open edge' in query)
+        name_clean = name.replace("_", " ")
+        if len(name) > 2:
+            if name in q or name_clean in q:
+                return entry
+            if difflib.SequenceMatcher(None, q, name).ratio() >= threshold:
+                return entry
 
     return None
 
 
 def resolve_skill_id(identifier: str, registry: Optional[Dict[str, Any]] = None) -> Optional[str]:
-    """Resolve an exact ID, skill name, or fuzzy-matched name (handling typos) to its registry key."""
+    """Resolve an exact ID, skill name, or fuzzy-matched name (handling typos and spaces) to its registry key."""
     if not identifier:
         return None
     if registry is None:
         registry = _load_registry()
     target = identifier.strip().lower()
+    target_clean = target.replace(" ", "_")
 
     # 1. Exact key match
     if target in registry:
         return target
+    if target_clean in registry:
+        return target_clean
 
-    # 2. Exact name match
+    # 2. Exact name match (with spaces or underscores)
     for sid, entry in registry.items():
-        if entry.get("name", "").lower() == target:
+        name = entry.get("name", "").lower()
+        if name in {target, target_clean} or name.replace("_", " ") == target:
             return sid
 
     # 3. Fuzzy name or ID match (handles typos like 'opne_edge' -> 'open_edge')
@@ -182,9 +239,10 @@ def resolve_skill_id(identifier: str, registry: Optional[Dict[str, Any]] = None)
     best_ratio = 0.0
     for sid, entry in registry.items():
         name = entry.get("name", "").lower()
-        r1 = difflib.SequenceMatcher(None, target, name).ratio()
-        r2 = difflib.SequenceMatcher(None, target, sid.lower()).ratio()
-        m = max(r1, r2)
+        r1 = difflib.SequenceMatcher(None, target_clean, name).ratio()
+        r2 = difflib.SequenceMatcher(None, target, name.replace("_", " ")).ratio()
+        r3 = difflib.SequenceMatcher(None, target, sid.lower()).ratio()
+        m = max(r1, r2, r3)
         if m > best_ratio and m >= 0.70:
             best_ratio = m
             best_id = sid
@@ -325,6 +383,56 @@ if __name__ == "__main__":
     run()
 '''
 
+    # 1. Check if common desktop application is requested
+    for app_name, app_exe in COMMON_APPS.items():
+        if app_name in clean_p or app_name in clean_n:
+            return f'''"""Trial skill: {name} - {purpose}"""
+import subprocess
+import os
+
+def run():
+    try:
+        subprocess.Popen(["{app_exe}"])
+        print("Launched {app_name} ({app_exe}) successfully.")
+    except Exception:
+        import webbrowser
+        webbrowser.open("https://www.google.com/search?q={app_name}")
+        print("Could not directly start {app_exe}; opened web fallback.")
+
+if __name__ == "__main__":
+    run()
+'''
+
+    # 2. Check if website or URL is requested
+    for site_name, site_url in COMMON_SITES.items():
+        if site_name in clean_p or site_name in clean_n:
+            return f'''"""Trial skill: {name} - {purpose}"""
+import webbrowser
+
+def run():
+    webbrowser.open("{site_url}")
+    print("Opened {site_name} at {site_url}.")
+
+if __name__ == "__main__":
+    run()
+'''
+
+    url_match = re.search(r"https?://\S+|www\.\S+|\b[a-zA-Z0-9-]+\.(?:com|org|net|io|edu|gov)\b", purpose)
+    if url_match:
+        found_url = url_match.group(0)
+        if not found_url.startswith("http"):
+            found_url = "https://" + found_url
+        return f'''"""Trial skill: {name} - {purpose}"""
+import webbrowser
+
+def run():
+    webbrowser.open("{found_url}")
+    print("Opened {found_url} in browser.")
+
+if __name__ == "__main__":
+    run()
+'''
+
     if any(k in clean_p for k in ("count", "stats", "lines", "words", "analyze text")):
         return f'''"""Trial skill: {name} - {purpose}"""
 def run(sample_text="Hello world\\nWelcome to Iris trial skills."):
@@ -395,11 +503,9 @@ def create_trial_skill(name: str, purpose: str, source_code: Optional[str] = Non
     if not is_valid:
         return f"Refused: The generated code violated sandbox security policies: {sec_reason}"
 
-    # Step 3: Extract search & fast-retrieval tags
-    tags = list({
-        clean_name,
-        *re.findall(r"[a-zA-Z0-9]{3,}", clean_purpose.lower())
-    })[:8]
+    # Step 3: Extract search & fast-retrieval tags (excluding generic action verbs like 'open', 'run')
+    extracted_words = [w for w in re.findall(r"[a-zA-Z0-9_-]{3,}", clean_purpose.lower()) if w not in STOP_WORDS]
+    tags = list(dict.fromkeys([clean_name, *extracted_words]))[:8]
 
     # Step 4: Save to cache & registry
     saved, result = save_trial_skill(clean_name, clean_purpose, tags, code)

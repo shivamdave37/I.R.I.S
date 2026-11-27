@@ -273,6 +273,36 @@ class AddTrialSkillAndRefusalTests(unittest.TestCase):
         res2 = dynamic_skills.execute_trial_skill("opne_edge")
         self.assertTrue(res2.success)
 
+    def test_distinctive_tag_matching_does_not_hijack_unrelated_queries(self):
+        """Generic words like 'open' do not trigger unrelated skills like open_edge."""
+        dynamic_skills.create_trial_skill("open_edge", "open edge browser")
+
+        # An unrelated command like 'open spotify' or 'open calculator' should NOT match open_edge
+        match = dynamic_skills.find_matching_trial_skill("open spotify")
+        self.assertIsNone(match)
+
+        # But 'open edge' or 'launch edge' DOES match
+        match2 = dynamic_skills.find_matching_trial_skill("open edge")
+        self.assertIsNotNone(match2)
+        self.assertEqual(match2["name"], "open_edge")
+
+    def test_delete_trial_skill_with_spaces_or_short_name(self):
+        """Users can delete trial skills by name with spaces or underscores."""
+        dynamic_skills.create_trial_skill("open_edge", "open edge browser")
+        self.assertEqual(len(dynamic_skills.list_trial_skills()), 1)
+
+        reply = task_planner.handle("delete trial open edge", input_fn=lambda p: "yes")
+        self.assertIn("has been removed", reply)
+        self.assertEqual(len(dynamic_skills.list_trial_skills()), 0)
+
+    def test_different_app_and_website_synthesis(self):
+        """Iris synthesizes real launchers for various desktop apps and websites."""
+        code_spotify = dynamic_skills.synthesize_trial_code("open_spotify", "open spotify music")
+        self.assertIn("spotify.exe", code_spotify)
+
+        code_reddit = dynamic_skills.synthesize_trial_code("open_reddit", "open reddit website")
+        self.assertIn("reddit.com", code_reddit)
+
 
 if __name__ == "__main__":
     unittest.main()

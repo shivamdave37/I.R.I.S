@@ -245,13 +245,17 @@ def _parse_local(command):
                 skill_name = "custom_trial_skill"
             purpose = rest
         return "add_trial_skill", {"name": skill_name, "purpose": purpose}
-    match = re.fullmatch(r"(?:run|execute)\s+(?:trial|temp skill)\s+([a-zA-Z0-9_-]+)", text, re.IGNORECASE)
+    match = re.fullmatch(r"(?:run|execute)\s+(?:trial|temp skill)\s*(?::\s*|\s+)(.+)", text, re.IGNORECASE)
     if match:
         return "run_trial_skill", {"skill_id": match.group(1).strip()}
-    match = re.fullmatch(r"promote\s+(?:trial|skill)\s+([a-zA-Z0-9_-]+)", text, re.IGNORECASE)
+    match = re.fullmatch(r"promote\s+(?:trial|skill)\s*(?::\s*|\s+)(.+)", text, re.IGNORECASE)
     if match:
         return "promote_trial_skill", {"skill_id": match.group(1).strip()}
-    match = re.fullmatch(r"(?:delete|remove|discard)\s+(?:trial|temp skill)\s+([a-zA-Z0-9_-]+)", text, re.IGNORECASE)
+    match = re.fullmatch(
+        r"(?:delete|remove|discard)\s+(?:(?:this\s+)?(?:from\s+)?(?:trial|temp skill)|trial\s+skill)\s*(?::\s*|\s+)(.+)",
+        text,
+        re.IGNORECASE
+    )
     if match:
         return "delete_trial_skill", {"skill_id": match.group(1).strip()}
 
