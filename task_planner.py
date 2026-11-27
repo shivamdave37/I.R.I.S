@@ -31,6 +31,9 @@ SKILL_PERMISSIONS = {
     "delete_task": "delete the selected task",
     "set_timer": "set a timer",
     "copy_to_clipboard": "copy text to clipboard",
+    "run_trial_skill": "run this trial skill in the isolated sandbox",
+    "promote_trial_skill": "promote this trial skill to permanent status",
+    "delete_trial_skill": "delete this trial skill from the registry",
 }
 SKILL_SCHEMAS = {
     name: set(policy.parameter_names)
@@ -40,7 +43,7 @@ ACTION_WORDS = (
     "open ", "launch ", "start ", "visit ", "save ", "note ", "search ", "find ", "research ",
     "propose skill ", "draft skill ", "delete ", "remove ", "tell ", "show ", "do ", "help me ",
     "click ", "type at ", "capture screen", "describe screen", "task ", "tasks", "todo",
-    "timer", "remind", "battery", "system ", "weather", "clipboard"
+    "timer", "remind", "battery", "system ", "weather", "clipboard", "trial ", "temp skill", "promote "
 )
 
 
@@ -213,11 +216,35 @@ def _parse_local(command):
     if match:
         return "copy_to_clipboard", {"text": match.group(1).strip()}
 
+    # Dynamic & Trial Skills
+    if normalized in {"trial skills", "show trial skills", "list trial skills", "temp skills", "list temp skills", "dynamic skills"}:
+        return "list_trial_skills", {}
+    match = re.fullmatch(r"(?:run|execute)\s+(?:trial|temp skill)\s+([a-zA-Z0-9_-]+)", text, re.IGNORECASE)
+    if match:
+        return "run_trial_skill", {"skill_id": match.group(1).strip()}
+    match = re.fullmatch(r"promote\s+(?:trial|skill)\s+([a-zA-Z0-9_-]+)", text, re.IGNORECASE)
+    if match:
+        return "promote_trial_skill", {"skill_id": match.group(1).strip()}
+    match = re.fullmatch(r"(?:delete|remove|discard)\s+(?:trial|temp skill)\s+([a-zA-Z0-9_-]+)", text, re.IGNORECASE)
+    if match:
+        return "delete_trial_skill", {"skill_id": match.group(1).strip()}
+
     target = _open_target(text)
     if target and (target in config.APPS or target in config.WEBSITES):
         return "open_target", {"target": target}
+
+    # Fast-retrieval pathway: check if an existing trial skill matches this command
+    try:
+        import dynamic_skills
+        trial_match = dynamic_skills.find_matching_trial_skill(text)
+        if trial_match:
+            return "run_trial_skill", {"skill_id": trial_match["skill_id"]}
+    except Exception:
+        pass
+
     if target:
         return "unsupported_open", {"target": target}
+
     return None
 
 
@@ -308,6 +335,10 @@ def _validate_step(step_data, index, prior_ids):
         clip_text = params["text"]
         if not isinstance(clip_text, str) or not clip_text.strip() or len(clip_text) > 5000:
             raise ValueError("Clipboard text must be 1 to 5000 characters.")
+    elif skill_name in {"run_trial_skill", "promote_trial_skill", "delete_trial_skill"}:
+        sid = params.get("skill_id")
+        if not isinstance(sid, str) or not sid.strip() or len(sid) > 100:
+            raise ValueError(f"Skill ID must be 1 to 100 characters in {step_id}.")
     permission = SKILL_PERMISSIONS.get(skill_name, "none")
     if skill_name == "delete_note":
         permission = f"delete note {params['index']}"
@@ -317,8 +348,14 @@ def _validate_step(step_data, index, prior_ids):
         permission = f"delete task {params['index']}"
     elif skill_name == "set_timer":
         permission = f"set a timer for {params['seconds']} seconds"
-    elif skill_name in {"list_tasks", "list_timers", "system_status", "battery_status", "get_weather", "read_clipboard"}:
+    elif skill_name in {"list_tasks", "list_timers", "system_status", "battery_status", "get_weather", "read_clipboard", "list_trial_skills"}:
         permission = "none"
+    elif skill_name == "run_trial_skill":
+        permission = f"run trial skill {params['skill_id']!r} in the isolated sandbox"
+    elif skill_name == "promote_trial_skill":
+        permission = f"promote trial skill {params['skill_id']!r} to permanent status"
+    elif skill_name == "delete_trial_skill":
+        permission = f"delete trial skill {params['skill_id']!r}"
     elif skill_name == "research_web":
         permission = "send this query to the configured web-search provider"
     elif skill_name == "search_files":

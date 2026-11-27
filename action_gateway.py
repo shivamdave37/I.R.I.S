@@ -27,11 +27,13 @@ STATE_CHANGING_ACTIONS = frozenset({
     "approve_skill_proposal", "withdraw_skill_proposal", "open_search_result",
     "capture_screen", "ui_click", "ui_type",
     "add_task", "complete_task", "delete_task", "set_timer", "copy_to_clipboard",
+    "run_trial_skill", "promote_trial_skill", "delete_trial_skill",
 })
 # This closed list is the only set allowed to skip a typed action approval.
 NO_APPROVAL_ACTIONS = frozenset({
     "tell_time", "tell_date", "list_notes", "search_notes", "chat", "help", "search_files",
     "list_tasks", "list_timers", "system_status", "battery_status", "get_weather", "read_clipboard",
+    "list_trial_skills",
 })
 MAX_NOTE_LENGTH = 2000
 MAX_CHAT_LENGTH = 4000
@@ -76,6 +78,10 @@ ACTION_POLICIES = {
     "get_weather": ActionPolicy(frozenset({"location"}), "external_request", False),
     "read_clipboard": ActionPolicy(frozenset(), "read_only", False),
     "copy_to_clipboard": ActionPolicy(frozenset({"text"}), "state_change", True),
+    "list_trial_skills": ActionPolicy(frozenset(), "read_only", False),
+    "run_trial_skill": ActionPolicy(frozenset({"skill_id"}), "state_change", True),
+    "promote_trial_skill": ActionPolicy(frozenset({"skill_id"}), "state_change", True),
+    "delete_trial_skill": ActionPolicy(frozenset({"skill_id"}), "state_change", True),
 }
 
 
@@ -271,6 +277,12 @@ def _approval_details(skill_name, params, prepared_target=None):
         return f"set a timer for {params['seconds']} seconds: {params['message']!r}"
     if skill_name == "copy_to_clipboard":
         return f"copy text to clipboard: {params['text']!r}"
+    if skill_name == "run_trial_skill":
+        return f"run trial skill {params['skill_id']!r} in the isolated sandbox"
+    if skill_name == "promote_trial_skill":
+        return f"promote trial skill {params['skill_id']!r} to permanent status"
+    if skill_name == "delete_trial_skill":
+        return f"delete trial skill {params['skill_id']!r} from the registry"
     raise InvalidAction("This skill has no approval description; it was refused.")
 
 
@@ -342,6 +354,23 @@ def _dispatch(skill_name, params, input_fn, prepared_target=None, prepared_scree
         return skills.read_clipboard()
     if skill_name == "copy_to_clipboard":
         return skills.copy_to_clipboard(params["text"])
+    if skill_name == "list_trial_skills":
+        import dynamic_skills
+        return dynamic_skills.list_formatted()
+    if skill_name == "run_trial_skill":
+        import dynamic_skills
+        res = dynamic_skills.execute_trial_skill(params["skill_id"])
+        if res.success:
+            return f"Trial skill succeeded:\n{res.output}" if res.output else "Trial skill executed successfully."
+        return f"Trial skill failed: {res.error}"
+    if skill_name == "promote_trial_skill":
+        import dynamic_skills
+        success, msg = dynamic_skills.promote_trial_skill(params["skill_id"])
+        return msg
+    if skill_name == "delete_trial_skill":
+        import dynamic_skills
+        success, msg = dynamic_skills.delete_trial_skill(params["skill_id"])
+        return msg
     raise InvalidAction("Unregistered action; it was refused.")
 
 
