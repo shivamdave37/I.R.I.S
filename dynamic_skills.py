@@ -276,6 +276,30 @@ def synthesize_trial_code(name: str, purpose: str) -> str:
     clean_p = purpose.lower()
     clean_n = name.lower()
 
+    if "edge" in clean_p or "edge" in clean_n or "msedge" in clean_p:
+        return f'''"""Trial skill: {name} - {purpose}"""
+import subprocess
+import os
+
+def run():
+    edge_paths = [
+        os.path.expandvars(r"%ProgramFiles(x86)%\\Microsoft\\Edge\\Application\\msedge.exe"),
+        os.path.expandvars(r"%ProgramFiles%\\Microsoft\\Edge\\Application\\msedge.exe"),
+        os.path.expandvars(r"%LocalAppData%\\Microsoft\\Edge\\Application\\msedge.exe"),
+    ]
+    target = next((p for p in edge_paths if os.path.exists(p)), None)
+    if target:
+        subprocess.Popen([target])
+        print("Launched Microsoft Edge successfully.")
+    else:
+        import webbrowser
+        webbrowser.open("https://www.bing.com")
+        print("Opened browser fallback.")
+
+if __name__ == "__main__":
+    run()
+'''
+
     if "chrome" in clean_p or "chrome" in clean_n:
         profile_flag = "Profile 1" if ("first" in clean_p or "1" in clean_p) else "Default"
         return f'''"""Trial skill: {name} - {purpose}"""
