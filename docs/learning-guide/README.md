@@ -14,6 +14,7 @@ This guide describes the repository as inspected on 27 October 2026. It includes
 - [x] User workflows and data flow: [07-workflows-and-safety.md](07-workflows-and-safety.md)
 - [x] Dependencies and testing: [08-dependencies-and-tests.md](08-dependencies-and-tests.md)
 - [x] Viva bank, glossary, recap, and exercises: [09-viva-and-revision.md](09-viva-and-revision.md)
+- [x] Complete Python libraries and modules catalog: [11-python-libraries-and-modules.md](11-python-libraries-and-modules.md)
 
 ## Honest line-coverage note
 
