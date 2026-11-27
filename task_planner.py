@@ -34,6 +34,7 @@ SKILL_PERMISSIONS = {
     "run_trial_skill": "run this trial skill in the isolated sandbox",
     "promote_trial_skill": "promote this trial skill to permanent status",
     "delete_trial_skill": "delete this trial skill from the registry",
+    "add_trial_skill": "validate and add this trial skill to the isolated sandbox",
 }
 SKILL_SCHEMAS = {
     name: set(policy.parameter_names)
@@ -43,7 +44,8 @@ ACTION_WORDS = (
     "open ", "launch ", "start ", "visit ", "save ", "note ", "search ", "find ", "research ",
     "propose skill ", "draft skill ", "delete ", "remove ", "tell ", "show ", "do ", "help me ",
     "click ", "type at ", "capture screen", "describe screen", "task ", "tasks", "todo",
-    "timer", "remind", "battery", "system ", "weather", "clipboard", "trial ", "temp skill", "promote "
+    "timer", "remind", "battery", "system ", "weather", "clipboard", "trial ", "temp skill", "promote ",
+    "add this to tr", "add to tr", "add this to trial", "add to trial"
 )
 
 
@@ -82,7 +84,8 @@ def _known_parts(command):
         r"find files|find file|find folder|find folders|open result|delete note|help\b|"
         r"add task|new task|todo\b|tasks\b|show tasks|list tasks|complete task|delete task|"
         r"set timer|remind me|timers\b|show timers|system status|specs\b|battery\b|weather\b|"
-        r"read clipboard|copy to clipboard)"
+        r"read clipboard|copy to clipboard|add this to tr|add to tr|add this to trial|add to trial|"
+        r"trial skills|temp skills|dynamic skills)"
     )
     separators = (
         rf",\s*(?:and\s+)?(?=(?:(?:please\s+)?(?:can you|could you)\s+)?{command_prefix_pattern})",
@@ -219,6 +222,29 @@ def _parse_local(command):
     # Dynamic & Trial Skills
     if normalized in {"trial skills", "show trial skills", "list trial skills", "temp skills", "list temp skills", "dynamic skills"}:
         return "list_trial_skills", {}
+    if normalized in {"add this to tr", "add to tr", "add this to trial", "add to trial", "add trial skill"}:
+        raise ValueError("Specify the skill to add, e.g.: 'add this to tr <name> for <purpose>' or 'add this to tr: <task>'.")
+    add_trial_match = re.match(
+        r"^(?:add\s+(?:this\s+)?to\s+(?:trial|tr)|add\s+trial\s+skill)\s*(?::\s*|\s+)(.+)$",
+        text,
+        re.IGNORECASE
+    )
+    if add_trial_match:
+        rest = add_trial_match.group(1).strip()
+        sub = re.match(r"^([a-zA-Z0-9_-]{2,30})\s+(?:for|to|:)\s+(.+)$", rest, re.IGNORECASE)
+        if sub:
+            skill_name = sub.group(1).strip().lower()
+            purpose = sub.group(2).strip()
+        else:
+            words = re.sub(r"[^a-zA-Z0-9\s_]", "", rest).split()
+            if len(words) >= 2:
+                skill_name = "_".join(words[:3]).lower()
+            elif words:
+                skill_name = words[0].lower()
+            else:
+                skill_name = "custom_trial_skill"
+            purpose = rest
+        return "add_trial_skill", {"name": skill_name, "purpose": purpose}
     match = re.fullmatch(r"(?:run|execute)\s+(?:trial|temp skill)\s+([a-zA-Z0-9_-]+)", text, re.IGNORECASE)
     if match:
         return "run_trial_skill", {"skill_id": match.group(1).strip()}
@@ -493,6 +519,8 @@ def _execute(steps, input_fn):
                 step.status = "failed"
             elif step.result.startswith(("Proposal creation denied", "Proposal approval denied", "Proposal withdrawal denied")):
                 step.status = "denied"
+            elif step.result.startswith("Refused:"):
+                step.status = "refused"
             else:
                 step.status = "succeeded"
         except action_gateway.ApprovalDenied as error:
@@ -529,7 +557,9 @@ def _summary(steps, cancelled=False):
         failed = sum(step.status == "failed" for step in steps)
         skipped = sum(step.status == "skipped" for step in steps)
         unverified = sum(step.status == "unverified" for step in steps)
-        title = f"Finished: {succeeded} succeeded, {failed} failed, {skipped} skipped, {unverified} unverified."
+        refused = sum(step.status == "refused" for step in steps)
+        refused_part = f", {refused} refused" if refused else ""
+        title = f"Finished: {succeeded} succeeded, {failed} failed, {skipped} skipped, {unverified} unverified{refused_part}."
     return title + "\n" + "\n".join(lines)
 
 
@@ -559,6 +589,6 @@ def handle(command, input_fn=input):
     preview = _describe_plan(local)
     print(preview)
     result = _execute(local, input_fn)
-    if len(local) == 1 and local[0].status == "succeeded":
+    if len(local) == 1 and local[0].status in {"succeeded", "refused"}:
         return local[0].result
     return result

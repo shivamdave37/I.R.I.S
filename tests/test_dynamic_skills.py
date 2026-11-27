@@ -176,5 +176,90 @@ class GatewayIntegrationTests(unittest.TestCase):
             action_gateway.execute("run_trial_skill", {"skill_id": skill_id}, lambda p: "no")
 
 
+class AddTrialSkillAndRefusalTests(unittest.TestCase):
+    """Test 'add this to tr' keyword, scope boundary validation, and refusal reasons."""
+
+    def setUp(self):
+        self.temp_dir = tempfile.mkdtemp(prefix="iris_add_trial_test_")
+        self.orig_dir = dynamic_skills.TEMP_SKILLS_DIR
+        self.orig_file = dynamic_skills.REGISTRY_FILE
+        dynamic_skills.TEMP_SKILLS_DIR = Path(self.temp_dir)
+        dynamic_skills.REGISTRY_FILE = Path(self.temp_dir) / "registry.json"
+
+    def tearDown(self):
+        dynamic_skills.TEMP_SKILLS_DIR = self.orig_dir
+        dynamic_skills.REGISTRY_FILE = self.orig_file
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    def test_refuse_network_socket_and_port_scanning(self):
+        """Requests attempting socket programming or port scanning are refused with a clear reason."""
+        msg = dynamic_skills.create_trial_skill("port_scanner", "port scan 127.0.0.1 for open ports")
+        self.assertTrue(msg.startswith("Refused:"))
+        self.assertIn("Network socket programming, port scanning", msg)
+
+    def test_refuse_windows_registry_modification(self):
+        """Requests attempting registry modifications are refused with a clear reason."""
+        msg = dynamic_skills.create_trial_skill("edit_reg", "modify winreg registry keys in windows")
+        self.assertTrue(msg.startswith("Refused:"))
+        self.assertIn("Modifying Windows registry", msg)
+
+    def test_refuse_password_and_secret_theft(self):
+        """Requests attempting to access passwords or browser credentials are refused."""
+        msg = dynamic_skills.create_trial_skill("stealer", "dump browser master key and passwords")
+        self.assertTrue(msg.startswith("Refused:"))
+        self.assertIn("Accessing stored credentials, passwords", msg)
+
+    def test_refuse_destructive_disk_operations(self):
+        """Requests attempting destructive disk formatting or wiping are refused."""
+        msg = dynamic_skills.create_trial_skill("wiper", "wipe disk and destroy os")
+        self.assertTrue(msg.startswith("Refused:"))
+        self.assertIn("Destructive disk operations", msg)
+
+    def test_refuse_dynamic_code_execution(self):
+        """Requests using eval, exec, or ctypes are refused."""
+        msg = dynamic_skills.create_trial_skill("dynamic_eval", "eval user input using ctypes")
+        self.assertTrue(msg.startswith("Refused:"))
+        self.assertIn("Dynamic code execution", msg)
+
+    def test_safe_trial_skill_creation_and_registration(self):
+        """Safe desktop requests succeed and register in the sandbox cache."""
+        msg = dynamic_skills.create_trial_skill(
+            name="chrome_first_account",
+            purpose="open my first account in chrome"
+        )
+        self.assertIn("added to trial cache", msg)
+        self.assertIn("run trial chrome_first_account", msg)
+
+        # Verify entry in registry
+        entries = dynamic_skills.list_trial_skills()
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0]["name"], "chrome_first_account")
+
+        # Verify executing newly added skill
+        result = dynamic_skills.execute_trial_skill(entries[0]["skill_id"])
+        self.assertTrue(result.success)
+
+    def test_task_planner_handles_add_this_to_tr_keyword(self):
+        """'add this to tr' command is routed through the planner and Action Gateway."""
+        command = "add this to tr chrome_account for open my first account in chrome"
+        reply = task_planner.handle(command, input_fn=lambda p: "yes")
+        self.assertIn("Trial skill 'chrome_account'", reply)
+        self.assertIn("added to trial cache", reply)
+
+    def test_task_planner_refuses_out_of_boundary_request(self):
+        """Out of boundary 'add this to tr' command is refused with explanatory reason."""
+        command = "add this to tr scan_ports for port scan on local network"
+        reply = task_planner.handle(command, input_fn=lambda p: "yes")
+        self.assertTrue(reply.startswith("Refused:"))
+        self.assertIn("Network socket programming, port scanning", reply)
+
+    def test_task_planner_approval_denial(self):
+        """User denying the add_trial_skill approval prevents skill creation."""
+        command = "add this to tr count_words for count words in text"
+        reply = task_planner.handle(command, input_fn=lambda p: "no")
+        self.assertIn("Approval denied", reply)
+        self.assertEqual(len(dynamic_skills.list_trial_skills()), 0)
+
+
 if __name__ == "__main__":
     unittest.main()

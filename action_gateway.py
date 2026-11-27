@@ -27,7 +27,7 @@ STATE_CHANGING_ACTIONS = frozenset({
     "approve_skill_proposal", "withdraw_skill_proposal", "open_search_result",
     "capture_screen", "ui_click", "ui_type",
     "add_task", "complete_task", "delete_task", "set_timer", "copy_to_clipboard",
-    "run_trial_skill", "promote_trial_skill", "delete_trial_skill",
+    "run_trial_skill", "promote_trial_skill", "delete_trial_skill", "add_trial_skill",
 })
 # This closed list is the only set allowed to skip a typed action approval.
 NO_APPROVAL_ACTIONS = frozenset({
@@ -82,6 +82,7 @@ ACTION_POLICIES = {
     "run_trial_skill": ActionPolicy(frozenset({"skill_id"}), "state_change", True),
     "promote_trial_skill": ActionPolicy(frozenset({"skill_id"}), "state_change", True),
     "delete_trial_skill": ActionPolicy(frozenset({"skill_id"}), "state_change", True),
+    "add_trial_skill": ActionPolicy(frozenset({"name", "purpose"}), "state_change", True),
 }
 
 
@@ -283,6 +284,8 @@ def _approval_details(skill_name, params, prepared_target=None):
         return f"promote trial skill {params['skill_id']!r} to permanent status"
     if skill_name == "delete_trial_skill":
         return f"delete trial skill {params['skill_id']!r} from the registry"
+    if skill_name == "add_trial_skill":
+        return f"validate and add trial skill {params['name']!r} for {params['purpose']!r} to the isolated sandbox"
     raise InvalidAction("This skill has no approval description; it was refused.")
 
 
@@ -371,6 +374,9 @@ def _dispatch(skill_name, params, input_fn, prepared_target=None, prepared_scree
         import dynamic_skills
         success, msg = dynamic_skills.delete_trial_skill(params["skill_id"])
         return msg
+    if skill_name == "add_trial_skill":
+        import dynamic_skills
+        return dynamic_skills.create_trial_skill(params["name"], params["purpose"])
     raise InvalidAction("Unregistered action; it was refused.")
 
 

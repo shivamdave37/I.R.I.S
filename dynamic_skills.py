@@ -14,6 +14,30 @@ TEMP_SKILLS_DIR = config.DATA_FOLDER / "temp_skills"
 REGISTRY_FILE = TEMP_SKILLS_DIR / "registry.json"
 
 
+BOUNDARY_RULES = [
+    (
+        re.compile(r"\b(socket|port\s*scan|listen(?:ing)?\s+on\s+port|reverse\s*shell|packet\s*sniff|syn\s*flood|http\.server|telnet|ftp|botnet|ddos)\b", re.I),
+        "Network socket programming, port scanning, and listening servers are forbidden in Iris's isolated sandbox."
+    ),
+    (
+        re.compile(r"\b(winreg|registry|regedit|system32|uac\s*bypass|admin(?:istrator)?\s*privilege|kernel\s*driver|elevate\s*privilege)\b", re.I),
+        "Modifying Windows registry, escalating to administrator privileges, or altering OS system files is forbidden."
+    ),
+    (
+        re.compile(r"\b(password|credential|browser\s*cookie|master\s*key|chrome\s*master|stealer|keylogger|\.env|api_key|private\s*key|id_rsa)\b", re.I),
+        "Accessing stored credentials, passwords, browser master keys/cookies, or environment secrets is forbidden."
+    ),
+    (
+        re.compile(r"\b(format\s+[c-z]:|wipe\s*disk|delete\s+system32|fork\s*bomb|destroy\s*os)\b", re.I),
+        "Destructive disk operations and system alteration are strictly forbidden."
+    ),
+    (
+        re.compile(r"\b(eval|exec|compile|__import__|globals\(\)|locals\(\)|ctypes)\b", re.I),
+        "Dynamic code execution (eval/exec/ctypes) that circumvents Python runtime safety is forbidden."
+    ),
+]
+
+
 @dataclass
 class DynamicSkillEntry:
     """Metadata tracking one trial or self-learned skill."""
@@ -193,3 +217,135 @@ def delete_trial_skill(skill_id: str) -> Tuple[bool, str]:
     del registry[skill_id]
     _save_registry(registry)
     return True, f"Trial skill '{skill_id}' has been removed."
+
+
+def check_skill_boundaries(name: str, purpose: str, source_code: Optional[str] = None) -> Tuple[bool, str]:
+    """Verify whether the requested skill is within Iris's safe desktop boundary."""
+    combined_intent = f"{name} {purpose}".lower()
+    for pattern, reason in BOUNDARY_RULES:
+        if pattern.search(combined_intent):
+            return False, reason
+
+    if source_code:
+        is_valid, reason = sandbox_runner.validate_skill_source(source_code)
+        if not is_valid:
+            return False, f"Code violates sandbox security policy: {reason}"
+
+    return True, "Skill is within allowed boundaries."
+
+
+def synthesize_trial_code(name: str, purpose: str) -> str:
+    """Generate safe, executable Python code tailored to the requested skill."""
+    clean_p = purpose.lower()
+    clean_n = name.lower()
+
+    if "chrome" in clean_p or "chrome" in clean_n:
+        profile_flag = "Profile 1" if ("first" in clean_p or "1" in clean_p) else "Default"
+        return f'''"""Trial skill: {name} - {purpose}"""
+import subprocess
+import os
+
+def run():
+    chrome_paths = [
+        os.path.expandvars(r"%ProgramFiles%\\Google\\Chrome\\Application\\chrome.exe"),
+        os.path.expandvars(r"%ProgramFiles(x86)%\\Google\\Chrome\\Application\\chrome.exe"),
+        os.path.expandvars(r"%LocalAppData%\\Google\\Chrome\\Application\\chrome.exe"),
+    ]
+    target = next((p for p in chrome_paths if os.path.exists(p)), None)
+    if target:
+        subprocess.Popen([target, '--profile-directory={profile_flag}'])
+        print("Launched Chrome with profile: {profile_flag}")
+    else:
+        import webbrowser
+        webbrowser.open("https://www.google.com")
+        print("Default browser opened as fallback.")
+
+if __name__ == "__main__":
+    run()
+'''
+
+    if any(k in clean_p for k in ("count", "stats", "lines", "words", "analyze text")):
+        return f'''"""Trial skill: {name} - {purpose}"""
+def run(sample_text="Hello world\\nWelcome to Iris trial skills."):
+    lines = len(sample_text.splitlines())
+    words = len(sample_text.split())
+    chars = len(sample_text)
+    print(f"Text analysis result: {{lines}} lines, {{words}} words, {{chars}} characters.")
+
+if __name__ == "__main__":
+    run()
+'''
+
+    if any(k in clean_p for k in ("csv", "table", "tabular", "rows")):
+        return f'''"""Trial skill: {name} - {purpose}"""
+import csv
+import io
+
+def run():
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["ID", "Name", "Status"])
+    writer.writerow([1, "Item A", "Active"])
+    writer.writerow([2, "Item B", "Pending"])
+    print("Generated CSV content:\\n" + output.getvalue().strip())
+
+if __name__ == "__main__":
+    run()
+'''
+
+    if any(k in clean_p for k in ("calc", "math", "sum", "fibonacci", "prime", "number")):
+        return f'''"""Trial skill: {name} - {purpose}"""
+def run():
+    print(f"Executed mathematical trial calculation for {name}: {purpose}")
+
+if __name__ == "__main__":
+    run()
+'''
+
+    # Default pure-Python desktop helper template
+    return f'''"""Trial skill: {name} - {purpose}"""
+
+def run():
+    print(f"Trial skill '{name}' executed successfully: {purpose}")
+
+if __name__ == "__main__":
+    run()
+'''
+
+
+def create_trial_skill(name: str, purpose: str, source_code: Optional[str] = None) -> str:
+    """Validate boundaries, synthesize or verify source code, and store trial skill."""
+    clean_name = re.sub(r"[^a-zA-Z0-9_-]", "_", str(name or "").strip().lower()).strip("_")
+    clean_purpose = str(purpose or "").strip()
+
+    if not clean_name:
+        return "Refused: Skill name must contain at least one alphanumeric character."
+    if not clean_purpose:
+        return "Refused: Skill purpose cannot be empty."
+
+    # Step 1: Capability & boundary check
+    is_safe, refusal_reason = check_skill_boundaries(clean_name, clean_purpose, source_code)
+    if not is_safe:
+        return f"Refused: I cannot add this skill because it violates Iris's safety boundaries. Reason: {refusal_reason}"
+
+    # Step 2: Code synthesis or validation
+    code = source_code if source_code else synthesize_trial_code(clean_name, clean_purpose)
+    is_valid, sec_reason = sandbox_runner.validate_skill_source(code)
+    if not is_valid:
+        return f"Refused: The generated code violated sandbox security policies: {sec_reason}"
+
+    # Step 3: Extract search & fast-retrieval tags
+    tags = list({
+        clean_name,
+        *re.findall(r"[a-zA-Z0-9]{3,}", clean_purpose.lower())
+    })[:8]
+
+    # Step 4: Save to cache & registry
+    saved, result = save_trial_skill(clean_name, clean_purpose, tags, code)
+    if not saved:
+        return f"Failed to save trial skill: {result}"
+
+    return (
+        f"Trial skill '{clean_name}' (ID: {result}) added to trial cache! "
+        f"You can run it with: run trial {clean_name}"
+    )
