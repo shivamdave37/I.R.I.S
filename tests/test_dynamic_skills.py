@@ -261,5 +261,18 @@ class AddTrialSkillAndRefusalTests(unittest.TestCase):
         self.assertEqual(len(dynamic_skills.list_trial_skills()), 0)
 
 
+    def test_execute_trial_skill_by_name_and_typo_tolerance(self):
+        """Executing trial skills works by clean name and tolerates small typos like 'opne_edge'."""
+        dynamic_skills.create_trial_skill("open_edge", "open edge browser")
+
+        # 1. By clean name
+        res1 = dynamic_skills.execute_trial_skill("open_edge")
+        self.assertTrue(res1.success)
+
+        # 2. By slight typo ('opne_edge')
+        res2 = dynamic_skills.execute_trial_skill("opne_edge")
+        self.assertTrue(res2.success)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -159,14 +159,49 @@ def find_matching_trial_skill(query: str, threshold: float = 0.70) -> Optional[D
     return None
 
 
+def resolve_skill_id(identifier: str, registry: Optional[Dict[str, Any]] = None) -> Optional[str]:
+    """Resolve an exact ID, skill name, or fuzzy-matched name (handling typos) to its registry key."""
+    if not identifier:
+        return None
+    if registry is None:
+        registry = _load_registry()
+    target = identifier.strip().lower()
+
+    # 1. Exact key match
+    if target in registry:
+        return target
+
+    # 2. Exact name match
+    for sid, entry in registry.items():
+        if entry.get("name", "").lower() == target:
+            return sid
+
+    # 3. Fuzzy name or ID match (handles typos like 'opne_edge' -> 'open_edge')
+    import difflib
+    best_id = None
+    best_ratio = 0.0
+    for sid, entry in registry.items():
+        name = entry.get("name", "").lower()
+        r1 = difflib.SequenceMatcher(None, target, name).ratio()
+        r2 = difflib.SequenceMatcher(None, target, sid.lower()).ratio()
+        m = max(r1, r2)
+        if m > best_ratio and m >= 0.70:
+            best_ratio = m
+            best_id = sid
+
+    return best_id
+
+
 def execute_trial_skill(skill_id: str, args: Optional[List[str]] = None) -> sandbox_runner.SandboxResult:
     """Retrieve skill source and execute inside the quarantined sandbox."""
     registry = _load_registry()
-    if skill_id not in registry:
+    resolved_id = resolve_skill_id(skill_id, registry)
+    if not resolved_id or resolved_id not in registry:
         return sandbox_runner.SandboxResult(
             success=False, output="", error=f"Skill '{skill_id}' not found in registry.", exit_code=-4
         )
 
+    skill_id = resolved_id
     entry = registry[skill_id]
     target_path = TEMP_SKILLS_DIR / entry["filename"]
     if not target_path.exists():
@@ -191,21 +226,23 @@ def execute_trial_skill(skill_id: str, args: Optional[List[str]] = None) -> sand
 def promote_trial_skill(skill_id: str) -> Tuple[bool, str]:
     """Promote an experimental trial skill to permanent verified status."""
     registry = _load_registry()
-    if skill_id not in registry:
+    resolved_id = resolve_skill_id(skill_id, registry)
+    if not resolved_id or resolved_id not in registry:
         return False, f"Trial skill '{skill_id}' does not exist."
 
-    registry[skill_id]["status"] = "promoted"
+    registry[resolved_id]["status"] = "promoted"
     _save_registry(registry)
-    return True, f"Skill '{skill_id}' has been promoted to permanent status."
+    return True, f"Skill '{resolved_id}' has been promoted to permanent status."
 
 
 def delete_trial_skill(skill_id: str) -> Tuple[bool, str]:
     """Delete a trial skill and remove it from the index."""
     registry = _load_registry()
-    if skill_id not in registry:
+    resolved_id = resolve_skill_id(skill_id, registry)
+    if not resolved_id or resolved_id not in registry:
         return False, f"Trial skill '{skill_id}' does not exist."
 
-    filename = registry[skill_id].get("filename")
+    filename = registry[resolved_id].get("filename")
     if filename:
         target_path = TEMP_SKILLS_DIR / filename
         if target_path.exists():
@@ -214,9 +251,9 @@ def delete_trial_skill(skill_id: str) -> Tuple[bool, str]:
             except OSError:
                 pass
 
-    del registry[skill_id]
+    del registry[resolved_id]
     _save_registry(registry)
-    return True, f"Trial skill '{skill_id}' has been removed."
+    return True, f"Trial skill '{resolved_id}' has been removed."
 
 
 def check_skill_boundaries(name: str, purpose: str, source_code: Optional[str] = None) -> Tuple[bool, str]:
